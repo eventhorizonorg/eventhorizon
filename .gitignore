@@ -1,0 +1,24 @@
+# ───── Canonical missile dataset ─────────────────────────────
+!data/missiles/latest_all.geojson
+!data/missiles/missile_attacks_daily.csv
+data/missiles/*
+
+# ───── ETL artefacts not meant for git ───────────────────────
+storage/raw/
+storage/rejected/
+storage/exports/*.tmp
+storage/exports/*.log
+storage/processed/
+*.sqlite
+*.log
+*.tmp
+
+# ───── Conda & editor cruft ──────────────────────────────────
+.env
+*.env
+.venv/
+*.py[cod]
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+.env.js 

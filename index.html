@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Mapbox App</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+      .pulse {
+        width: 40px;
+        height: 40px;
+        background: rgba(255,0,0,0.4);
+        border-radius: 50%;
+        position: absolute;
+        left: -20px;
+        top: -20px;
+        animation: pulse 1.5s infinite;
+        z-index: 10;
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(0.5);
+          opacity: 1;
+        }
+        70% {
+          transform: scale(1.5);
+          opacity: 0.2;
+        }
+        100% {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+      }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src=".env.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
