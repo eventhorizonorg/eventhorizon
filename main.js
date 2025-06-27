@@ -28,8 +28,8 @@ class EarthquakeGlobe {
         this.map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/dark-v11',
-            center: [0, 30], // Adjusted center to better accommodate info panel
-            zoom: 2,
+            center: [0, 0], // Centered on equator and prime meridian
+            zoom: 1.5, // Slightly zoomed out for better global view
             pitch: supportsGlobe ? 45 : 0,
             projection: supportsGlobe ? 'globe' : 'mercator'
         });
