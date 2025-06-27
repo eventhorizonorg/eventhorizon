@@ -113,7 +113,6 @@ class EarthquakeGlobe {
 
             const data = await response.json();
             this.processEarthquakeData(data);
-            this.updateUI();
             
         } catch (error) {
             console.error('Error loading earthquake data:', error);
@@ -156,13 +155,13 @@ class EarthquakeGlobe {
         this.earthquakeData = limitedFeatures;
         this.lastUpdateTime = now;
 
-        // Update map data with fade-in animation
+        // Update map data
         if (this.map.getSource('earthquakes')) {
-            this.animateNewEarthquakes(limitedFeatures);
+            this.updateEarthquakes(limitedFeatures);
         }
     }
 
-    animateNewEarthquakes(newFeatures) {
+    updateEarthquakes(newFeatures) {
         // Create GeoJSON FeatureCollection
         const geojsonData = {
             type: 'FeatureCollection',
@@ -200,20 +199,6 @@ class EarthquakeGlobe {
             .setLngLat([coords[0], coords[1]])
             .setHTML(popupContent)
             .addTo(this.map);
-    }
-
-    updateUI() {
-        const countElement = document.getElementById('earthquake-count');
-        const updateElement = document.getElementById('last-update');
-
-        if (countElement) {
-            countElement.textContent = `${this.earthquakeData.length} earthquakes`;
-        }
-
-        if (updateElement && this.lastUpdateTime) {
-            const updateTime = new Date(this.lastUpdateTime).toLocaleTimeString();
-            updateElement.textContent = `Last update: ${updateTime}`;
-        }
     }
 
     startAutoRefresh() {
