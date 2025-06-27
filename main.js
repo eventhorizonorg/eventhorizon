@@ -2,7 +2,7 @@
 // Data source: USGS Earthquake Hazards Program
 // License: Public Domain
 
-// You'll need to set your Mapbox access token
+// Set your Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZGFuaWVsc3VueXVhbiIsImEiOiJjbHBiM3FhOXUwYmxnMmtubzljcGRwcHBjIn0.MO5mlsRbbl-O6labngyIaA';
 
 class EarthquakeGlobe {
@@ -28,7 +28,7 @@ class EarthquakeGlobe {
         this.map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/dark-v11',
-            center: [0, 20],
+            center: [0, 30], // Adjusted center to better accommodate info panel
             zoom: 2,
             pitch: supportsGlobe ? 45 : 0,
             projection: supportsGlobe ? 'globe' : 'mercator'
@@ -139,10 +139,18 @@ class EarthquakeGlobe {
             .sort((a, b) => b.properties.time - a.properties.time)
             .slice(0, 1500);
 
-        // Add depth property for styling
+        // Process features for Mapbox GL compatibility
         limitedFeatures.forEach(feature => {
             const coords = feature.geometry.coordinates;
-            feature.properties.depth = Math.abs(coords[2]) || 0;
+            const props = feature.properties;
+            
+            // Add depth property for styling (convert negative depth to positive)
+            props.depth = Math.abs(coords[2]) || 0;
+            
+            // Ensure magnitude is available
+            if (!props.mag) {
+                props.mag = 0;
+            }
         });
 
         this.earthquakeData = limitedFeatures;
@@ -155,28 +163,17 @@ class EarthquakeGlobe {
     }
 
     animateNewEarthquakes(newFeatures) {
-        // Set initial opacity to 0 for new features
-        const featuresWithAnimation = newFeatures.map(feature => ({
-            ...feature,
-            properties: {
-                ...feature.properties,
-                opacity: 0
-            }
-        }));
+        // Create GeoJSON FeatureCollection
+        const geojsonData = {
+            type: 'FeatureCollection',
+            features: newFeatures
+        };
 
         // Update source with new data
-        this.map.getSource('earthquakes').setData({
-            type: 'FeatureCollection',
-            features: featuresWithAnimation
-        });
+        this.map.getSource('earthquakes').setData(geojsonData);
 
-        // Animate to full opacity
-        setTimeout(() => {
-            this.map.getSource('earthquakes').setData({
-                type: 'FeatureCollection',
-                features: newFeatures
-            });
-        }, 100);
+        // Log for debugging
+        console.log(`Updated map with ${newFeatures.length} earthquake features`);
     }
 
     showEarthquakePopup(e) {
@@ -184,7 +181,7 @@ class EarthquakeGlobe {
         const props = feature.properties;
         const coords = feature.geometry.coordinates;
 
-        const magnitude = props.mag.toFixed(1);
+        const magnitude = props.mag ? props.mag.toFixed(1) : 'Unknown';
         const depth = Math.abs(coords[2]).toFixed(1);
         const time = new Date(props.time).toUTCString();
         const place = props.place || 'Unknown location';
@@ -195,12 +192,12 @@ class EarthquakeGlobe {
                 <p><strong>Location:</strong> ${place}</p>
                 <p><strong>Depth:</strong> ${depth} km</p>
                 <p><strong>Time:</strong> ${time}</p>
-                <a href="${props.url}" target="_blank" rel="noopener">More info on USGS</a>
+                ${props.url ? `<a href="${props.url}" target="_blank" rel="noopener">More info on USGS</a>` : ''}
             </div>
         `;
 
         new mapboxgl.Popup()
-            .setLngLat(coords)
+            .setLngLat([coords[0], coords[1]])
             .setHTML(popupContent)
             .addTo(this.map);
     }
