@@ -1,0 +1,172 @@
+/* Live Earthquakes Globe Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #000;
+    color: #fff;
+    overflow: hidden;
+}
+
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100vh;
+}
+
+.info-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 280px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1000;
+}
+
+.info-panel h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #fff;
+}
+
+.info-panel p {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 16px;
+}
+
+.legend {
+    margin-bottom: 16px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.legend-color.shallow {
+    background: #ffeda0;
+}
+
+.legend-color.intermediate {
+    background: #fd8d3c;
+}
+
+.legend-color.deep {
+    background: #f03b20;
+}
+
+.status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 12px;
+}
+
+.earthquake-popup {
+    font-family: inherit;
+    max-width: 300px;
+}
+
+.earthquake-popup h4 {
+    margin-bottom: 12px;
+    color: #f03b20;
+    font-size: 16px;
+}
+
+.earthquake-popup p {
+    margin-bottom: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.earthquake-popup a {
+    display: inline-block;
+    margin-top: 8px;
+    color: #4a90e2;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.earthquake-popup a:hover {
+    text-decoration: underline;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .info-panel {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        min-width: auto;
+        padding: 16px;
+    }
+    
+    .info-panel h3 {
+        font-size: 16px;
+    }
+    
+    .legend-item {
+        font-size: 12px;
+    }
+    
+    .status {
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .info-panel {
+        position: relative;
+        margin: 10px;
+        background: rgba(0, 0, 0, 0.9);
+    }
+    
+    #map {
+        height: calc(100vh - 200px);
+        top: 180px;
+    }
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.6;
+    }
+}
+
+.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
