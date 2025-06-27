@@ -3,7 +3,7 @@
 // License: Public Domain
 
 // You'll need to set your Mapbox access token
-mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+mapboxgl.accessToken = 'pk.eyJ1IjoiZGFuaWVsc3VueXVhbiIsImEiOiJjbHBiM3FhOXUwYmxnMmtubzljcGRwcHBjIn0.MO5mlsRbbl-O6labngyIaA';
 
 class EarthquakeGlobe {
     constructor() {
