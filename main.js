@@ -2,6 +2,9 @@
 // Data source: USGS Earthquake Hazards Program
 // License: Public Domain
 
+// You'll need to set your Mapbox access token
+mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+
 class EarthquakeGlobe {
     constructor() {
         this.map = null;
@@ -22,9 +25,9 @@ class EarthquakeGlobe {
         // Check if device supports globe projection
         const supportsGlobe = this.checkGlobeSupport();
         
-        this.map = new maplibregl.Map({
+        this.map = new mapboxgl.Map({
             container: 'map',
-            style: 'https://demotiles.maplibre.org/style.json',
+            style: 'mapbox://styles/mapbox/dark-v11',
             center: [0, 20],
             zoom: 2,
             pitch: supportsGlobe ? 45 : 0,
@@ -196,7 +199,7 @@ class EarthquakeGlobe {
             </div>
         `;
 
-        new maplibregl.Popup()
+        new mapboxgl.Popup()
             .setLngLat(coords)
             .setHTML(popupContent)
             .addTo(this.map);
