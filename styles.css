@@ -1,0 +1,69 @@
+/* Live Earthquakes Globe Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #000;
+    color: #fff;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+#map {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+}
+
+.earthquake-popup {
+    font-family: inherit;
+    max-width: 300px;
+}
+
+.earthquake-popup h4 {
+    margin-bottom: 12px;
+    color: #f03b20;
+    font-size: 16px;
+}
+
+.earthquake-popup p {
+    margin-bottom: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.earthquake-popup a {
+    display: inline-block;
+    margin-top: 8px;
+    color: #4a90e2;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.earthquake-popup a:hover {
+    text-decoration: underline;
+}
+
+/* Mapbox popup styling overrides */
+.mapboxgl-popup-content {
+    background: rgba(0, 0, 0, 0.9) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+}
+
+.mapboxgl-popup-tip {
+    border-top-color: rgba(0, 0, 0, 0.9) !important;
+}

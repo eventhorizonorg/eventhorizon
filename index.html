@@ -1,44 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Mapbox App</title>
-    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-    <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
-    <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <link rel="stylesheet" href="style.css">
-    <style>
-      .pulse {
-        width: 40px;
-        height: 40px;
-        background: rgba(255,0,0,0.4);
-        border-radius: 50%;
-        position: absolute;
-        left: -20px;
-        top: -20px;
-        animation: pulse 1.5s infinite;
-        z-index: 10;
-      }
-      @keyframes pulse {
-        0% {
-          transform: scale(0.5);
-          opacity: 1;
-        }
-        70% {
-          transform: scale(1.5);
-          opacity: 0.2;
-        }
-        100% {
-          transform: scale(0.5);
-          opacity: 0;
-        }
-      }
-    </style>
+    <title>Live Earthquakes Globe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="map"></div>
-    <script src=".env.js"></script>
-    <script src="script.js"></script>
+    <script src="main.js"></script>
 </body>
-</html> 
+</html>
