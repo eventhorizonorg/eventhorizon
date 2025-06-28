@@ -1,0 +1,12 @@
+[telegram]
+# Your Telegram API credentials
+# Get these from https://my.telegram.org/apps
+api_id = YOUR_API_ID_HERE
+api_hash = YOUR_API_HASH_HERE
+
+[extraction]
+# Default extraction settings
+output_dir = ../data/unprocessed
+session_file = ../extract_session.session
+batch_size = 100
+max_messages = 1000 
