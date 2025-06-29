@@ -14,11 +14,15 @@ storage/processed/
 *.tmp
 
 # ───── Conda & editor cruft ──────────────────────────────────
-.env
-*.env
+# .env
+# *.env
 .venv/
 *.py[cod]
 __pycache__/
 .ipynb_checkpoints/
 .DS_Store
-.env.js 
+.env.js
+
+OpenConflictExtractor 
+tg-etl/telegram_app_config_29116378.txt
+tg-etl/data/backup

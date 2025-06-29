@@ -2,14 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Live Earthquakes Globe</title>
+    <title>Telegram Conflict Events Map</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .quick-preview {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 1px solid #00ff88;
+            border-radius: 4px;
+        }
+        .quick-preview .mapboxgl-popup-content {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 1px solid #00ff88;
+            border-radius: 4px;
+            padding: 8px 12px;
+        }
+    </style>
 </head>
 <body>
+    <div id="elevenlabs-widget-container" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+        <elevenlabs-convai agent-id="agent_01jyw46y05excaqywsrar3a4tb"></elevenlabs-convai>
+    </div>
     <div id="map"></div>
-    <script src="main.js"></script>
+    <script>
+        // Set your Mapbox access token
+        const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGFuaWVsc3VueXVhbiIsImEiOiJjbHBiM3FhOXUwYmxnMmtubzljcGRwcHBjIn0.MO5mlsRbbl-O6labngyIaA';
+    </script>
+    <script src="script.js"></script>
+    <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 </body>
 </html>

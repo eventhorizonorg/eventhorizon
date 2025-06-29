@@ -444,4 +444,4 @@ async def extract_channels(
         await parser.connect()
         return await parser.extract_multiple_channels(identifiers, output_dir, limit_per_channel)
     finally:
-        await parser.disconnect() 
+        await parser.disconnect()
