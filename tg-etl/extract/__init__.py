@@ -1,1 +1,0 @@
-# Extract package for Telegram data extraction 

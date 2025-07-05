@@ -1,6 +1,9 @@
 // Minimal Mapbox + Telegram events script
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
+// Initialize Supabase client
+const supabase = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/dark-v11',
@@ -8,46 +11,95 @@ const map = new mapboxgl.Map({
   zoom: 4
 });
 
-// Highlight Russia and Ukraine borders only
-function highlightCountry(iso_a3, fillColor, fillOpacity, borderColor) {
-  map.on('load', () => {
-    map.addSource(iso_a3 + '-border', {
-      type: 'vector',
-      url: 'mapbox://mapbox.country-boundaries-v1'
-    });
-    map.addLayer({
-      id: iso_a3 + '-fill',
-      type: 'fill',
-      source: iso_a3 + '-border',
-      'source-layer': 'country_boundaries',
-      filter: ['==', ['get', 'iso_3166_1_alpha_3'], iso_a3],
-      paint: {
-        'fill-color': fillColor,
-        'fill-opacity': fillOpacity
-      }
-    });
-    map.addLayer({
-      id: iso_a3 + '-outline',
-      type: 'line',
-      source: iso_a3 + '-border',
-      'source-layer': 'country_boundaries',
-      filter: ['==', ['get', 'iso_3166_1_alpha_3'], iso_a3],
-      paint: {
-        'line-color': borderColor,
-        'line-width': 2
-      }
-    });
-  });
-}
-
-// highlightCountry('UKR', '#90caf9', 0.08, '#42a5f5');
-// highlightCountry('RUS', '#ff8a80', 0.08, '#e57373');
-
 // Global variables for data management
 let allTelegramData = null;
 let currentDayData = null;
 let hoveredPoint = null;
 let popup = null;
+let highlightedCountry = null;
+let selectedCountry = null;
+
+// Function to get country code from coordinates using Mapbox Geocoding API
+async function getCountryFromCoordinates(lng, lat) {
+  try {
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=country&access_token=${mapboxgl.accessToken}`
+    );
+    const data = await response.json();
+    if (data.features && data.features.length > 0) {
+      return data.features[0].properties.short_code?.toUpperCase();
+    }
+  } catch (error) {
+    console.error('Error getting country from coordinates:', error);
+  }
+  return null;
+}
+
+// Highlight country borders
+function highlightCountry(iso_a3, fillColor = '#90caf9', fillOpacity = 0.15, borderColor = '#42a5f5') {
+  if (!iso_a3) return;
+  
+  // Remove existing highlight if different country
+  if (highlightedCountry && highlightedCountry !== iso_a3) {
+    clearCountryHighlight();
+  }
+  
+  // Don't re-add if already highlighted
+  if (highlightedCountry === iso_a3) return;
+  
+  map.addSource(iso_a3 + '-border', {
+    type: 'vector',
+    url: 'mapbox://mapbox.country-boundaries-v1'
+  });
+  
+  map.addLayer({
+    id: iso_a3 + '-fill',
+    type: 'fill',
+    source: iso_a3 + '-border',
+    'source-layer': 'country_boundaries',
+    filter: ['==', ['get', 'iso_3166_1_alpha_3'], iso_a3],
+    paint: {
+      'fill-color': fillColor,
+      'fill-opacity': fillOpacity
+    }
+  });
+  
+  map.addLayer({
+    id: iso_a3 + '-outline',
+    type: 'line',
+    source: iso_a3 + '-border',
+    'source-layer': 'country_boundaries',
+    filter: ['==', ['get', 'iso_3166_1_alpha_3'], iso_a3],
+    paint: {
+      'line-color': borderColor,
+      'line-width': 2
+    }
+  });
+  
+  highlightedCountry = iso_a3;
+}
+
+// Clear country highlight
+function clearCountryHighlight() {
+  if (!highlightedCountry) return;
+  
+  const countryCode = highlightedCountry;
+  
+  // Remove layers if they exist
+  if (map.getLayer(countryCode + '-fill')) {
+    map.removeLayer(countryCode + '-fill');
+  }
+  if (map.getLayer(countryCode + '-outline')) {
+    map.removeLayer(countryCode + '-outline');
+  }
+  
+  // Remove source if it exists
+  if (map.getSource(countryCode + '-border')) {
+    map.removeSource(countryCode + '-border');
+  }
+  
+  highlightedCountry = null;
+}
 
 // Get current date in YYYY-MM-DD format
 function getCurrentDate() {
@@ -55,59 +107,93 @@ function getCurrentDate() {
   return today.toISOString().split('T')[0];
 }
 
-// Filter data by date and quality
-function filterDataByDate(data, date) {
-  if (!data || !data.features) return [];
-  
-  return data.features.filter(feature => {
-    const featureDate = feature.properties.date?.split('T')[0];
-    const hasValidDate = featureDate === date;
-    
-    // Only include points with reasonable geolocation
-    const geolocation = feature.properties.geolocation;
-    const hasValidGeolocation = geolocation && 
-                               geolocation.lat && 
-                               geolocation.lon && 
-                               geolocation.confidence > 0.5 &&
-                               geolocation.source !== 'llm_geocoding_city_only'; // Filter out bad LLM results
-    
-    return hasValidDate && hasValidGeolocation;
-  });
-}
-
-// Load GeoJSON data
+// Load GeoJSON data from Supabase
 async function loadTelegramGeoJSON() {
   try {
-    const response = await fetch('tg-etl/data/geojson/filtered_telegram_data.geojson');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    console.log('Loading data from Supabase...');
+    
+    // Fetch data from your Supabase table
+    // Adjust the table name and columns based on your schema
+    const { data, error } = await supabase
+      .from('telegram_events') // Replace with your actual table name
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
     }
-    allTelegramData = await response.json();
-    console.log('Loaded all Telegram data:', allTelegramData.features.length, 'features');
+    
+    if (!data || data.length === 0) {
+      console.log('No data found in Supabase, loading sample data instead');
+      // Fallback to sample data if no Supabase data
+      const response = await fetch('sample_data.geojson');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      allTelegramData = await response.json();
+    } else {
+      console.log('Loaded data from Supabase:', data.length, 'records');
+      
+      // Convert Supabase data to GeoJSON format
+      allTelegramData = {
+        type: 'FeatureCollection',
+        features: data.map(record => ({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [record.longitude, record.latitude] // Adjust column names as needed
+          },
+          properties: {
+            id: record.id,
+            text: record.text || record.message || '',
+            channel: record.channel || record.channel_name || '',
+            timestamp: record.created_at || record.timestamp,
+            media_url: record.media_url || null,
+            telegram_url: record.telegram_url || null,
+            // Add any other properties from your Supabase schema
+            ...record
+          }
+        }))
+      };
+    }
+    
+    console.log('Processed data:', allTelegramData.features.length, 'features');
     
     // Load all data
     loadAllData();
     
   } catch (error) {
-    console.error('Error loading Telegram GeoJSON:', error);
+    console.error('Error loading data:', error);
+    // Fallback to sample data on error
+    try {
+      const response = await fetch('sample_data.geojson');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      allTelegramData = await response.json();
+      loadAllData();
+    } catch (fallbackError) {
+      console.error('Error loading fallback data:', fallbackError);
+    }
   }
 }
 
 // Load and display all data (not just current day)
 function loadAllData() {
-  // Use all data instead of filtering by current date
-  const allData = allTelegramData.features.filter(feature => {
-    // Only include points with reasonable geolocation
-    const geolocation = feature.properties.geolocation;
-    const hasValidGeolocation = geolocation && 
-                               geolocation.confidence > 0.5 &&
-                               geolocation.source !== 'llm_geocoding_city_only'; // Filter out bad LLM results
-    
-    return hasValidGeolocation;
+  // Use all sample data
+  let allData = allTelegramData.features.map(feature => {
+    // Assign a random phase offset for pulsation (0 to 2π)
+    feature.properties.pulse_phase = Math.random() * Math.PI * 2;
+    // Initialize pulse properties
+    feature.properties.pulse_radius = 8;
+    feature.properties.pulse_blur = 0.7;
+    return feature;
   });
-  
-  console.log('All valid data:', allData.length, 'features');
-  
+
+  // Save for animation
+  window._allDataForPulse = allData;
+
   if (map.getSource('telegram-events')) {
     map.getSource('telegram-events').setData({
       type: 'FeatureCollection',
@@ -128,16 +214,40 @@ function loadAllData() {
       type: 'circle',
       source: 'telegram-events',
       paint: {
-        'circle-radius': 6,
-        'circle-color': '#ffffff',
-        'circle-opacity': 0.9,
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-opacity': 0.6
+        // Use per-feature animated properties
+        'circle-radius': ['get', 'pulse_radius'],
+        'circle-color': '#fff',
+        'circle-opacity': 0.85,
+        'circle-stroke-width': 0,
+        'circle-blur': ['get', 'pulse_blur']
       }
     });
 
-    // Add event listeners
+    // Add pulsating animation to the points with per-dot phase
+    let pulseStart = null;
+    function animatePulse(ts) {
+      if (!pulseStart) pulseStart = ts;
+      const elapsed = (ts - pulseStart) / 1000; // seconds
+      const freq = 0.25; // 0.25 Hz (one pulse every 4 seconds)
+      const omega = 2 * Math.PI * freq;
+      // Animate each feature's radius and blur
+      for (const feature of window._allDataForPulse) {
+        const phase = feature.properties.pulse_phase;
+        const pulse = 1 + 0.25 * Math.sin(omega * elapsed + phase);
+        feature.properties.pulse_radius = 10 * pulse; // base size * pulse
+        feature.properties.pulse_blur = 0.7 + 0.5 * Math.abs(Math.sin(omega * elapsed + phase));
+      }
+      // Update the source data
+      if (map.getSource('telegram-events')) {
+        map.getSource('telegram-events').setData({
+          type: 'FeatureCollection',
+          features: window._allDataForPulse
+        });
+      }
+      requestAnimationFrame(animatePulse);
+    }
+    requestAnimationFrame(animatePulse);
+
     setupEventListeners();
   }
 }
@@ -146,8 +256,8 @@ function loadAllData() {
 function setupEventListeners() {
   let popupTimeout;
   
-  // Hover effects only
-  map.on('mouseenter', 'telegram-event-points', (e) => {
+  // Hover effects
+  map.on('mouseenter', 'telegram-event-points', async (e) => {
     map.getCanvas().style.cursor = 'pointer';
     
     // Clear any existing timeout
@@ -162,10 +272,21 @@ function setupEventListeners() {
     const properties = feature.properties;
     
     showQuickPreview(coordinates, properties);
+    
+    // Highlight country on hover
+    const countryCode = await getCountryFromCoordinates(coordinates[0], coordinates[1]);
+    if (countryCode) {
+      highlightCountry(countryCode, '#90caf9', 0.15, '#42a5f5');
+    }
   });
 
   map.on('mouseleave', 'telegram-event-points', () => {
     map.getCanvas().style.cursor = '';
+    
+    // Clear country highlight on mouse leave (unless clicked)
+    if (!selectedCountry) {
+      clearCountryHighlight();
+    }
     
     // Set a timeout to hide the popup after 2 seconds
     popupTimeout = setTimeout(() => {
@@ -174,6 +295,29 @@ function setupEventListeners() {
         popup = null;
       }
     }, 2000); // 2 seconds delay
+  });
+  
+  // Click effects
+  map.on('click', 'telegram-event-points', async (e) => {
+    const feature = e.features[0];
+    const coordinates = feature.geometry.coordinates.slice();
+    const properties = feature.properties;
+    
+    // Get country code and highlight it
+    const countryCode = await getCountryFromCoordinates(coordinates[0], coordinates[1]);
+    if (countryCode) {
+      // Clear previous selection
+      if (selectedCountry && selectedCountry !== countryCode) {
+        clearCountryHighlight();
+      }
+      
+      // Highlight selected country with different color
+      highlightCountry(countryCode, '#ff8a80', 0.2, '#e57373');
+      selectedCountry = countryCode;
+    }
+    
+    // Show detailed popup on click
+    showDetailedPopup(coordinates, properties);
   });
   
   // Keep popup visible when hovering over it
@@ -195,6 +339,22 @@ function setupEventListeners() {
       }
     }, 2000); // 2 seconds delay
   });
+  
+  // Clear selection when clicking on empty map
+  map.on('click', (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['telegram-event-points'] });
+    if (features.length === 0) {
+      // Clicked on empty space, clear selection
+      if (selectedCountry) {
+        clearCountryHighlight();
+        selectedCountry = null;
+      }
+      if (popup) {
+        popup.remove();
+        popup = null;
+      }
+    }
+  });
 }
 
 // Show quick preview on hover
@@ -202,14 +362,23 @@ function showQuickPreview(coordinates, properties) {
   if (popup) popup.remove();
   
   const date = new Date(properties.date).toLocaleDateString();
-  const text = properties.text ? properties.text.substring(0, 300) + (properties.text.length > 300 ? '...' : '') : 'No text content';
+  const time = new Date(properties.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const text = properties.text ? properties.text.substring(0, 200) + (properties.text.length > 200 ? '...' : '') : 'No text content';
   
   const previewContent = `
-    <div style="max-width:350px; padding:15px; font-family:Arial,sans-serif; line-height:1.5; word-break:break-word; white-space:pre-line;">
-      <div style="font-size:12px; color:#666; margin-bottom:10px;">${date}</div>
-      <div style="font-size:14px; margin-bottom:15px;">${text}</div>
-      <div style="font-size:12px; color:#0066cc;">
-        <a href="${properties.telegram_url}" target="_blank" style="color:#0066cc; text-decoration:none;">View on Telegram</a>
+    <div class="popup-content">
+      <div class="popup-header">
+        <div class="popup-date">${date} at ${time}</div>
+        <div class="popup-provider">${properties.source_username || 'Telegram'}</div>
+      </div>
+      <div class="popup-text">${text}</div>
+      <div class="popup-footer">
+        <a href="${properties.telegram_url}" target="_blank" class="popup-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          View on Telegram
+        </a>
       </div>
     </div>
   `;
@@ -224,19 +393,67 @@ function showQuickPreview(coordinates, properties) {
     .addTo(map);
 }
 
-// Date slider functionality (for future implementation)
-function updateDataByDate(date) {
-  if (!allTelegramData) return;
+// Show detailed popup on click
+function showDetailedPopup(coordinates, properties) {
+  if (popup) popup.remove();
   
-  const filteredData = filterDataByDate(allTelegramData, date);
-  console.log('Updated data for', date, ':', filteredData.length, 'features');
+  const date = new Date(properties.date).toLocaleDateString();
+  const time = new Date(properties.date).toLocaleTimeString();
+  const text = properties.text || 'No text content';
+  const geolocation = properties.geolocation;
   
-  if (map.getSource('telegram-events')) {
-    map.getSource('telegram-events').setData({
-      type: 'FeatureCollection',
-      features: filteredData
-    });
+  let locationInfo = '';
+  if (geolocation) {
+    const locationParts = [];
+    if (geolocation.city) locationParts.push(geolocation.city);
+    if (geolocation.region) locationParts.push(geolocation.region);
+    if (geolocation.country) locationParts.push(geolocation.country);
+    
+    locationInfo = `
+      <div class="popup-location">
+        <div class="location-item">
+          <span class="location-label">📍 Location:</span>
+          <span class="location-value">${locationParts.join(', ') || 'Unknown'}</span>
+        </div>
+        <div class="location-item">
+          <span class="location-label">🎯 Confidence:</span>
+          <span class="location-value">${(geolocation.confidence * 100).toFixed(1)}%</span>
+        </div>
+        <div class="location-item">
+          <span class="location-label">🔍 Source:</span>
+          <span class="location-value">${geolocation.source || 'Unknown'}</span>
+        </div>
+      </div>
+    `;
   }
+  
+  const detailedContent = `
+    <div class="popup-content detailed">
+      <div class="popup-header">
+        <div class="popup-date">${date} at ${time}</div>
+        <div class="popup-provider">${properties.source_username || 'Telegram'}</div>
+      </div>
+      ${locationInfo}
+      <div class="popup-text detailed-text">${text}</div>
+      <div class="popup-footer">
+        <a href="${properties.telegram_url}" target="_blank" class="popup-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          View on Telegram
+        </a>
+      </div>
+    </div>
+  `;
+
+  popup = new mapboxgl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    className: 'detailed-popup'
+  })
+    .setLngLat(coordinates)
+    .setHTML(detailedContent)
+    .addTo(map);
 }
 
 // Initialize when map loads
@@ -245,7 +462,6 @@ map.on('load', () => {
 });
 
 // Export functions for future date slider
-window.updateDataByDate = updateDataByDate;
 window.getCurrentDate = getCurrentDate;
 
 // --- ElevenLabs Map Integration ---
@@ -405,7 +621,7 @@ class ElevenLabsMapController {
   }
 
   clearRegionHighlight() {
-    // Optionally implement if you want to clear highlights
+    clearCountryHighlight();
   }
 
   triggerLocationSearch(location) {

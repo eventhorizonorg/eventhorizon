@@ -1,0 +1,100 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [32.0853, 49.8397]
+      },
+      "properties": {
+        "id": "sample_1",
+        "date": "2024-06-30T10:30:00Z",
+        "text": "Sample conflict event in Kyiv region. Military activity reported in the area.",
+        "telegram_url": "https://t.me/sample_channel/123",
+        "source_username": "sample_channel",
+        "geolocation": {
+          "confidence": 0.85,
+          "source": "sample_data",
+          "place_name": "Kyiv, Ukraine"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6173, 55.7558]
+      },
+      "properties": {
+        "id": "sample_2",
+        "date": "2024-06-30T11:15:00Z",
+        "text": "Another sample event in Moscow. This is demonstration data.",
+        "telegram_url": "https://t.me/sample_channel/124",
+        "source_username": "sample_channel",
+        "geolocation": {
+          "confidence": 0.92,
+          "source": "sample_data",
+          "place_name": "Moscow, Russia"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [34.7818, 32.0853]
+      },
+      "properties": {
+        "id": "sample_3",
+        "date": "2024-06-30T12:00:00Z",
+        "text": "Sample event in Tel Aviv. Demonstration data point.",
+        "telegram_url": "https://t.me/sample_channel/125",
+        "source_username": "sample_channel",
+        "geolocation": {
+          "confidence": 0.78,
+          "source": "sample_data",
+          "place_name": "Tel Aviv, Israel"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [51.389, 35.6892]
+      },
+      "properties": {
+        "id": "sample_4",
+        "date": "2024-06-30T13:45:00Z",
+        "text": "Sample event in Tehran. This is for demonstration purposes.",
+        "telegram_url": "https://t.me/sample_channel/126",
+        "source_username": "sample_channel",
+        "geolocation": {
+          "confidence": 0.88,
+          "source": "sample_data",
+          "place_name": "Tehran, Iran"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [30.5234, 50.4501]
+      },
+      "properties": {
+        "id": "sample_5",
+        "date": "2024-06-30T14:20:00Z",
+        "text": "Another sample event in Kyiv. Demonstration data for the map.",
+        "telegram_url": "https://t.me/sample_channel/127",
+        "source_username": "sample_channel",
+        "geolocation": {
+          "confidence": 0.91,
+          "source": "sample_data",
+          "place_name": "Kyiv, Ukraine"
+        }
+      }
+    }
+  ]
+} 
