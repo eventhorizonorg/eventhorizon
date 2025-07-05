@@ -14,8 +14,8 @@ storage/processed/
 *.tmp
 
 # ───── Conda & editor cruft ──────────────────────────────────
-# .env
-# *.env
+.env
+*.env
 .venv/
 *.py[cod]
 __pycache__/
