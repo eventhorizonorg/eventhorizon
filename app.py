@@ -2,12 +2,18 @@ from flask import Flask, render_template, send_from_directory, jsonify
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from flask_cors import CORS
 import json
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app, origins=[
+    "https://*.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:8001"
+])
 
 # Initialize Supabase client
 def get_supabase_client():

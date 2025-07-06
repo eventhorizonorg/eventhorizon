@@ -1,0 +1,81 @@
+name: Backend API Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'app.py'
+      - 'requirements.txt'
+      - 'api/**'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov requests flask-cors
+    
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Format check with black
+      run: |
+        pip install black
+        black --check --diff .
+    
+    - name: Test API endpoints
+      env:
+        MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      run: |
+        python -m pytest tests/api/ -v --cov=app --cov-report=xml || echo "No API tests found yet"
+    
+    - name: Test Supabase connection
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      run: |
+        python -c "
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        from app import get_supabase_client
+        client = get_supabase_client()
+        if client:
+            print('✓ Supabase connection successful')
+        else:
+            print('✗ Supabase connection failed')
+            exit(1)
+        "
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false 

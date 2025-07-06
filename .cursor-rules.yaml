@@ -1,0 +1,242 @@
+# Cursor Rules for openconflict
+# Clean, organized, and maintainable code standards
+
+# =============================================================================
+# GLOBAL SETTINGS
+# =============================================================================
+
+# Code formatting standards
+max_line_length: 100
+indent_style: space
+indent_size: 4
+charset: utf-8
+trim_trailing_whitespace: true
+insert_final_newline: true
+
+# =============================================================================
+# PYTHON CONFIGURATION
+# =============================================================================
+
+python:
+  # Formatters and linters
+  formatter: black
+  lint: flake8
+  import_sorter: isort
+  
+  # Test configuration
+  test_pattern: "tests/**/*.py"
+  run_tests_command: "pytest"
+  run_lint_command: "flake8 ."
+  run_format_command: "black ."
+  run_import_sort_command: "isort ."
+  
+  # Environment and dependencies
+  env_file: ".env"
+  requirements_file: "requirements.txt"
+  
+  # Tool-specific configurations
+  black_args: ["--line-length=100", "--skip-string-normalization"]
+  flake8_args: ["--max-line-length=100", "--extend-ignore=E203,W503"]
+  isort_args: ["--profile=black", "--line-length=100"]
+
+# =============================================================================
+# JAVASCRIPT CONFIGURATION
+# =============================================================================
+
+javascript:
+  # Linting (disabled for now, can be enabled with eslint)
+  lint: false
+  test_pattern: "static/*.js"
+  
+  # Optional configurations (for future use)
+  eslint_config: ".eslintrc.js"
+  prettier_config: ".prettierrc"
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+
+docs:
+  main_readme: "README.md"
+  contributing: "docs/contributing.md"
+  ci_cd: "docs/ci_cd.md"
+  frontend: "docs/frontend.md"
+  cursor_rules: "docs/cursor-rules.md"
+  code_of_conduct: "CODE_OF_CONDUCT.md"
+  license: "LICENSE"
+
+# =============================================================================
+# CI/CD CONFIGURATION
+# =============================================================================
+
+ci:
+  workflows_dir: ".github/workflows"
+  main_workflows:
+    - backend-tests.yml
+    - frontend-quality.yml
+    - integration-tests.yml
+    - security-scan.yml
+    - vercel-deployment.yml
+  secrets_required:
+    - MAPBOX_TOKEN
+    - SUPABASE_URL
+    - SUPABASE_ANON_KEY
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+vercel:
+  config_file: "vercel.json"
+  env_vars:
+    - MAPBOX_TOKEN
+    - BACKEND_URL
+  static_dirs:
+    - static/
+    - templates/
+
+supabase:
+  env_vars:
+    - SUPABASE_URL
+    - SUPABASE_ANON_KEY
+  config_file: "supabase/config.toml"
+
+# =============================================================================
+# FILE ORGANIZATION
+# =============================================================================
+
+structure:
+  docs: "docs/"
+  tests: "tests/"
+  static: "static/"
+  templates: "templates/"
+  workflows: ".github/workflows/"
+  config_files:
+    - "requirements.txt"
+    - "pytest.ini"
+    - "vercel.json"
+    - ".cursor-rules.yaml"
+
+# =============================================================================
+# IGNORE PATTERNS
+# =============================================================================
+
+ignore:
+  # Environment and secrets
+  - .env
+  - .env.local
+  - .env.*.local
+  
+  # Python cache and build
+  - __pycache__/
+  - .pytest_cache/
+  - *.pyc
+  - *.pyo
+  - build/
+  - dist/
+  - *.egg-info/
+  
+  # IDEs and editors
+  - .vscode/
+  - .idea/
+  - *.swp
+  - *.swo
+  - *~
+  
+  # OS files
+  - .DS_Store
+  - .DS_Store?
+  - ._*
+  - Thumbs.db
+  
+  # Logs and temp files
+  - *.log
+  - logs/
+  - *.tmp
+  - *.temp
+  
+  # Vercel
+  - .vercel/
+  
+  # Node (if needed later)
+  - node_modules/
+  - npm-debug.log*
+  - yarn-debug.log*
+  - yarn-error.log*
+
+# =============================================================================
+# CODE QUALITY STANDARDS
+# =============================================================================
+
+standards:
+  # Python standards
+  python:
+    - "Use type hints where appropriate"
+    - "Follow PEP 8 with Black formatting"
+    - "Write docstrings for functions and classes"
+    - "Use meaningful variable names"
+    - "Keep functions small and focused"
+    - "Use environment variables for all secrets"
+    - "Write tests for new features"
+  
+  # JavaScript standards
+  javascript:
+    - "Use ES6+ syntax"
+    - "Avoid console.log in production"
+    - "Use meaningful variable names"
+    - "Keep functions small and focused"
+    - "Use const/let instead of var"
+    - "Fetch API keys from backend, never hardcode"
+  
+  # Documentation standards
+  docs:
+    - "Keep documentation up to date"
+    - "Use clear and concise language"
+    - "Include code examples where helpful"
+    - "Update docs when making significant changes"
+    - "Use emojis for better readability"
+  
+  # Testing standards
+  testing:
+    - "Write tests for new features"
+    - "Maintain good test coverage"
+    - "Use descriptive test names"
+    - "Test both success and failure cases"
+    - "Mock external dependencies"
+  
+  # Security standards
+  security:
+    - "Never commit secrets or API keys"
+    - "Use environment variables for all sensitive data"
+    - "Validate all user inputs"
+    - "Keep dependencies updated"
+    - "Run security scans regularly"
+
+# =============================================================================
+# PROJECT-SPECIFIC RULES
+# =============================================================================
+
+project_rules:
+  # Frontend development
+  frontend:
+    - "All frontend code goes in static/ and templates/"
+    - "Use Mapbox GL JS for mapping functionality"
+    - "Keep JavaScript modular and well-organized"
+    - "Use semantic HTML in templates"
+    - "Avoid hardcoded tokens in frontend code"
+  
+  # Backend development
+  backend:
+    - "Flask app structure in app.py"
+    - "API endpoints follow RESTful conventions"
+    - "Use Supabase for database operations"
+    - "Implement proper error handling"
+    - "Use CORS for cross-origin requests"
+  
+  # Deployment
+  deployment:
+    - "Frontend deploys to Vercel"
+    - "Backend can deploy to any platform"
+    - "Environment variables set in deployment platform"
+    - "CI/CD runs on all pushes to main"
+    - "Test all changes before deployment" 

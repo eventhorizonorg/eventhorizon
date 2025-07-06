@@ -1,0 +1,66 @@
+name: Vercel Deployment Check
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'static/**'
+      - 'templates/**'
+      - 'vercel.json'
+
+jobs:
+  vercel-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Vercel CLI
+      run: npm install --global vercel@latest
+    
+    - name: Check Vercel configuration
+      run: |
+        if [ -f "vercel.json" ]; then
+          echo "✓ Vercel configuration found"
+          cat vercel.json
+        else
+          echo "⚠ No vercel.json found - using defaults"
+        fi
+    
+    - name: Check static files
+      run: |
+        echo "Checking static files..."
+        if [ -d "static" ]; then
+          echo "✓ Static directory found"
+          ls -la static/
+        else
+          echo "⚠ No static directory found"
+        fi
+    
+    - name: Check templates
+      run: |
+        echo "Checking templates..."
+        if [ -d "templates" ]; then
+          echo "✓ Templates directory found"
+          ls -la templates/
+        else
+          echo "⚠ No templates directory found"
+        fi
+    
+    - name: Validate environment variables
+      run: |
+        echo "Checking for required environment variables..."
+        echo "The following should be set in Vercel dashboard:"
+        echo "- MAPBOX_TOKEN"
+        echo "- BACKEND_URL (if using separate backend)"
+        echo "- Any other API keys needed by frontend"
+    
+    - name: Test build process
+      run: |
+        echo "Testing if project structure is valid for Vercel..."
+        # Check if we have the basic structure for a static site
+        if [ -f "templates/index.html" ]; then
+          echo "✓ index.html template found"
+        else
+          echo "⚠ No index.html template found"
+        fi 

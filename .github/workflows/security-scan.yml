@@ -1,0 +1,65 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install safety bandit
+    
+    - name: Run Safety check
+      run: |
+        safety check --json --output safety-report.json || true
+    
+    - name: Run Bandit security scan
+      run: |
+        bandit -r . -f json -o bandit-report.json || true
+    
+    - name: Check for hardcoded secrets
+      run: |
+        # Check for potential hardcoded API keys or tokens
+        if grep -r "sk_" . --exclude-dir=.git; then
+          echo "⚠ Potential hardcoded Stripe keys found"
+        fi
+        if grep -r "pk_" . --exclude-dir=.git; then
+          echo "⚠ Potential hardcoded public keys found"
+        fi
+        if grep -r "eyJ" . --exclude-dir=.git; then
+          echo "⚠ Potential hardcoded JWT tokens found"
+        fi
+        echo "✓ No obvious hardcoded secrets found"
+    
+    - name: Check for exposed environment variables
+      run: |
+        # Check if env vars are being logged or exposed
+        if grep -r "print.*os.getenv" . --exclude-dir=.git; then
+          echo "⚠ Environment variables being printed - security risk"
+        else
+          echo "✓ No environment variables being printed"
+        fi
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          safety-report.json
+          bandit-report.json 

@@ -1,6 +1,7 @@
 // Mapbox access token will be loaded from environment
 let MAPBOX_TOKEN;
 let map;
+let pulseStart = Date.now();
 
 // Initialize the map after loading the token
 async function initMap() {
@@ -28,7 +29,6 @@ async function initMap() {
             bearing: 0
         });
 
-        // Add pure black space with minimal stars and darker water
         map.on('load', async () => {
             // Set fog for space background
             map.setFog({
@@ -38,13 +38,12 @@ async function initMap() {
                 'space-color': '#000000',
                 'star-intensity': 0.3
             });
-            
-            // Make water darker
             map.setPaintProperty('water', 'fill-color', '#0a0a0a');
             map.setPaintProperty('water', 'fill-opacity', 0.8);
-            
-            // Load and plot Telegram messages
-            await loadAndPlotMessages();
+            // Load and plot Telegram messages as GeoJSON
+            await loadAndPlotMessagesGeoJSON();
+            // Start pulse animation
+            animatePulse();
         });
         
     } catch (error) {
@@ -52,75 +51,144 @@ async function initMap() {
     }
 }
 
-// Fetch and plot Telegram messages
-async function loadAndPlotMessages() {
+// Fetch and plot Telegram messages as GeoJSON
+async function loadAndPlotMessagesGeoJSON() {
     try {
-        console.log('Loading Telegram messages...');
         const response = await fetch('/api/messages');
         const data = await response.json();
-        
         if (data.error) {
             console.error('Failed to load messages:', data.error);
             return;
         }
-        
-        console.log(`Loaded ${data.count} geolocated messages`);
-        
-        // Plot each message as a marker
-        data.messages.forEach(message => {
-            if (message.latitude && message.longitude) {
-                plotMessage(message);
+        // Convert to GeoJSON FeatureCollection
+        const features = data.messages.map((msg, i) => ({
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [msg.longitude, msg.latitude]
+            },
+            properties: {
+                id: msg.id,
+                text: msg.text,
+                date: msg.date,
+                channel: msg.channel,
+                country_code: msg.country_code,
+                phase: (i * 2 * Math.PI) / data.messages.length // phase offset for pulse
             }
+        }));
+        const geojson = {
+            type: 'FeatureCollection',
+            features
+        };
+        // Add source
+        if (map.getSource('telegram-points')) {
+            map.getSource('telegram-points').setData(geojson);
+        } else {
+            map.addSource('telegram-points', {
+                type: 'geojson',
+                data: geojson
+            });
+            // Add circle layer
+            map.addLayer({
+                id: 'telegram-points-layer',
+                type: 'circle',
+                source: 'telegram-points',
+                paint: {
+                    'circle-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'pulse'],
+                        0, 5,
+                        1, 10
+                    ],
+                    'circle-color': '#fff',
+                    'circle-blur': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'pulse'],
+                        0, 0.2,
+                        1, 0.7
+                    ],
+                    'circle-opacity': 0.9,
+                    'circle-stroke-width': 0,
+                }
+            });
+        }
+        // Add popup on hover (fade in/out, stays open if hovering popup)
+        let hoverPopup = new mapboxgl.Popup({ closeButton: true, maxWidth: '300px' });
+        let popupOpen = false;
+        let popupShouldClose = false;
+        function closePopupWithFade() {
+            const popupEl = document.querySelector('.mapboxgl-popup-content .fade-in');
+            if (popupEl) {
+                popupEl.classList.remove('fade-in');
+                popupEl.classList.add('fade-out');
+                setTimeout(() => hoverPopup.remove(), 200);
+            } else {
+                hoverPopup.remove();
+            }
+            popupOpen = false;
+        }
+        map.on('mouseenter', 'telegram-points-layer', (e) => {
+            map.getCanvas().style.cursor = 'pointer';
+            const feature = e.features[0];
+            const props = feature.properties;
+            const coordinates = feature.geometry.coordinates.slice();
+            const popupContent = `
+                <div class="message-popup fade-in" id="telegram-hover-popup">
+                    <h4>📢 ${props.channel}</h4>
+                    <p><strong>Date:</strong> ${new Date(props.date).toLocaleString()}</p>
+                    <p><strong>Location:</strong> ${parseFloat(coordinates[1]).toFixed(4)}, ${parseFloat(coordinates[0]).toFixed(4)}</p>
+                    ${props.country_code ? `<p><strong>Country:</strong> ${props.country_code}</p>` : ''}
+                    <div class="message-text">
+                        <strong>Message:</strong><br>
+                        ${props.text}
+                    </div>
+                </div>
+            `;
+            hoverPopup.setLngLat(coordinates).setHTML(popupContent).addTo(map);
+            popupOpen = true;
+            popupShouldClose = false;
+            setTimeout(() => {
+                const popupDiv = document.getElementById('telegram-hover-popup');
+                if (popupDiv) {
+                    popupDiv.addEventListener('mouseenter', () => {
+                        popupShouldClose = false;
+                    });
+                    popupDiv.addEventListener('mouseleave', () => {
+                        popupShouldClose = true;
+                        setTimeout(() => {
+                            if (popupShouldClose) closePopupWithFade();
+                        }, 10);
+                    });
+                }
+            }, 10);
         });
-        
+        map.on('mouseleave', 'telegram-points-layer', () => {
+            map.getCanvas().style.cursor = '';
+            popupShouldClose = true;
+            setTimeout(() => {
+                if (popupShouldClose && popupOpen) closePopupWithFade();
+            }, 10);
+        });
     } catch (error) {
         console.error('Error loading messages:', error);
     }
 }
 
-// Plot a single message on the map
-function plotMessage(message) {
-    // Create a custom marker element
-    const markerEl = document.createElement('div');
-    markerEl.className = 'telegram-marker';
-    markerEl.style.width = '12px';
-    markerEl.style.height = '12px';
-    markerEl.style.borderRadius = '50%';
-    markerEl.style.backgroundColor = '#ff4444';
-    markerEl.style.border = '2px solid #ffffff';
-    markerEl.style.cursor = 'pointer';
-    markerEl.style.boxShadow = '0 0 10px rgba(255, 68, 68, 0.5)';
-    
-    // Create the marker
-    const marker = new mapboxgl.Marker(markerEl)
-        .setLngLat([message.longitude, message.latitude])
-        .addTo(map);
-    
-    // Create popup content
-    const popupContent = `
-        <div class="message-popup">
-            <h4>📢 ${message.channel}</h4>
-            <p><strong>Date:</strong> ${new Date(message.date).toLocaleString()}</p>
-            <p><strong>Location:</strong> ${message.latitude.toFixed(4)}, ${message.longitude.toFixed(4)}</p>
-            ${message.country_code ? `<p><strong>Country:</strong> ${message.country_code}</p>` : ''}
-            <div class="message-text">
-                <strong>Message:</strong><br>
-                ${message.text.length > 200 ? message.text.substring(0, 200) + '...' : message.text}
-            </div>
-        </div>
-    `;
-    
-    // Create popup
-    const popup = new mapboxgl.Popup({
-        closeButton: true,
-        maxWidth: '300px'
-    }).setHTML(popupContent);
-    
-    // Add click event to marker
-    markerEl.addEventListener('click', () => {
-        marker.setPopup(popup);
-        popup.addTo(map);
+// Animate pulse for all points with phase offset
+function animatePulse() {
+    if (!map || !map.getSource('telegram-points')) return;
+    const geojson = map.getSource('telegram-points')._data;
+    const now = Date.now();
+    const t = ((now - pulseStart) / 1000) % 2; // 2s period
+    geojson.features.forEach(f => {
+        // Pulse: 0..1..0 (sinusoidal)
+        const phase = f.properties.phase || 0;
+        f.properties.pulse = 0.5 * (1 + Math.sin(2 * Math.PI * t / 2 + phase));
     });
+    map.getSource('telegram-points').setData(geojson);
+    requestAnimationFrame(animatePulse);
 }
 
 // Test Supabase connection
