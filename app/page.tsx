@@ -3,12 +3,15 @@
 import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+import type { FeatureCollection, Feature, Point } from 'geojson'
+import React from 'react'
 
 export default function Home() {
   console.log('Page loaded')
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const pulseStart = useRef(Date.now())
+  const geojsonRef = useRef<FeatureCollection<Point>>({ type: 'FeatureCollection', features: [] })
 
   useEffect(() => {
     if (!mapContainer.current) return
@@ -23,7 +26,7 @@ export default function Home() {
           style: 'mapbox://styles/mapbox/dark-v11',
           center: [0, 0],
           zoom: 1.5,
-          projection: 'globe',
+          projection: 'globe' as any,
           pitch: 0,
           bearing: 0
         })
@@ -70,7 +73,7 @@ export default function Home() {
       }
 
       // Convert to GeoJSON FeatureCollection
-      const features = data.messages.map((msg: any, i: number) => ({
+      const features: Feature<Point>[] = data.messages.map((msg: any, i: number) => ({
         type: 'Feature',
         geometry: {
           type: 'Point',
@@ -86,10 +89,11 @@ export default function Home() {
         }
       }))
 
-      const geojson = {
+      const geojson: FeatureCollection<Point> = {
         type: 'FeatureCollection',
         features
       }
+      geojsonRef.current = geojson
 
       if (!map.current) return
 
@@ -150,22 +154,39 @@ export default function Home() {
         map.current!.getCanvas().style.cursor = 'pointer'
         const feature = e.features![0]
         const props = feature.properties!
-        const coordinates = feature.geometry.coordinates.slice()
+        let coordinates: [number, number] = [0, 0]
+        if (feature.geometry.type === 'Point') {
+          const coords = (feature.geometry as Point).coordinates
+          if (Array.isArray(coords) && coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+            coordinates = [coords[0], coords[1]]
+          }
+        }
         
+        let locationString = 'Unknown';
+        if (
+          Array.isArray(coordinates) &&
+          coordinates.length === 2 &&
+          typeof coordinates[0] === 'number' &&
+          typeof coordinates[1] === 'number' &&
+          !isNaN(coordinates[0]) &&
+          !isNaN(coordinates[1])
+        ) {
+          locationString = `${coordinates[1].toFixed(4)}, ${coordinates[0].toFixed(4)}`;
+        }
         const popupContent = `
           <div class="message-popup fade-in" id="telegram-hover-popup">
-            <h4>📢 ${props.channel}</h4>
-            <p><strong>Date:</strong> ${new Date(props.date).toLocaleString()}</p>
-            <p><strong>Location:</strong> ${parseFloat(coordinates[1]).toFixed(4)}, ${parseFloat(coordinates[0]).toFixed(4)}</p>
-            ${props.country_code ? `<p><strong>Country:</strong> ${props.country_code}</p>` : ''}
+            <h4>📢 ${String(props.channel)}</h4>
+            <p><strong>Date:</strong> ${new Date(String(props.date)).toLocaleString()}</p>
+            <p><strong>Location:</strong> ${locationString}</p>
+            ${props.country_code ? `<p><strong>Country:</strong> ${String(props.country_code)}</p>` : ''}
             <div class="message-text">
               <strong>Message:</strong><br>
-              ${props.text}
+              ${String(props.text)}
             </div>
           </div>
         `
         
-        hoverPopup.setLngLat(coordinates).setHTML(popupContent).addTo(map.current!)
+        hoverPopup.setLngLat(coordinates as [number, number]).setHTML(popupContent).addTo(map.current!)
         popupOpen = true
         popupShouldClose = false
         
@@ -200,8 +221,7 @@ export default function Home() {
 
   const animatePulse = () => {
     if (!map.current || !map.current.getSource('telegram-points')) return
-    
-    const geojson = (map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource)._data
+    const geojson = geojsonRef.current
     const now = Date.now()
     const t = ((now - pulseStart.current) / 1000) % 2 // 2s period
     
