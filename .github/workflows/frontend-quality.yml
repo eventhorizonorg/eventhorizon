@@ -4,15 +4,15 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'static/**'
-      - 'templates/**'
+      - 'app/**'
       - 'package.json'
-      - 'vercel.json'
+      - 'next.config.js'
+      - 'tailwind.config.ts'
   pull_request:
     branches: [ main ]
     paths:
-      - 'static/**'
-      - 'templates/**'
+      - 'app/**'
+      - 'package.json'
 
 jobs:
   frontend-quality:
@@ -21,71 +21,57 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
     
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install beautifulsoup4
+    - name: Install dependencies
+      run: npm ci
     
-    - name: Install Node.js dependencies
-      run: |
-        if [ -f "package.json" ]; then
-          npm ci
-        else
-          echo "No package.json found, skipping npm install"
-        fi
+    - name: TypeScript type checking
+      run: npx tsc --noEmit
+    
+    - name: ESLint check
+      run: npm run lint
     
     - name: Check for console errors
       run: |
         # Check for console.log statements in production code
-        if grep -r "console.log" static/; then
-          echo "Warning: console.log statements found in static files"
+        if grep -r "console.log" app/ --exclude="*.test.*" --exclude="*.spec.*"; then
+          echo "Warning: console.log statements found in app files"
         else
-          echo "✓ No console.log statements found in static files"
+          echo "✓ No console.log statements found in app files"
         fi
     
-    - name: Validate HTML templates
+    - name: Validate Next.js configuration
       run: |
-        # Basic HTML validation
-        python -c "
-        import os
-        try:
-            from bs4 import BeautifulSoup
-            for file in os.listdir('templates'):
-                if file.endswith('.html'):
-                    with open(f'templates/{file}', 'r') as f:
-                        soup = BeautifulSoup(f.read(), 'html.parser')
-                        print(f'✓ {file} is valid HTML')
-        except ImportError:
-            print('BeautifulSoup not available, skipping HTML validation')
-        except Exception as e:
-            print(f'HTML validation error: {e}')
-        "
-    
-    - name: Check JavaScript syntax
-      run: |
-        # Basic JavaScript syntax check
-        for file in static/*.js; do
-          if [ -f "$file" ]; then
-            node -c "$file" && echo "✓ $file syntax is valid"
-          fi
-        done
+        # Check if next.config.js exists and is valid
+        if [ -f "next.config.js" ]; then
+          node -c next.config.js && echo "✓ next.config.js is valid"
+        else
+          echo "✗ next.config.js not found"
+          exit 1
+        fi
     
     - name: Check for Mapbox token usage
       run: |
-        # Ensure Mapbox token is being fetched from API
-        if grep -r "mapboxgl.accessToken" static/; then
-          echo "✓ Mapbox token is being set from API"
+        # Ensure Mapbox token is being used from environment
+        if grep -r "process.env.NEXT_PUBLIC_MAPBOX_TOKEN" app/; then
+          echo "✓ Mapbox token is being used from environment"
         else
-          echo "Warning: Mapbox token not found in static files"
-        fi 
+          echo "Warning: Mapbox token usage not found in app files"
+        fi
+    
+    - name: Check for Supabase integration
+      run: |
+        # Ensure Supabase is properly integrated
+        if grep -r "@supabase/supabase-js" app/; then
+          echo "✓ Supabase integration found"
+        else
+          echo "Warning: Supabase integration not found"
+        fi
+    
+    - name: Build test
+      run: npm run build 

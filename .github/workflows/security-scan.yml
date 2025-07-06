@@ -15,51 +15,65 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
       with:
-        python-version: '3.11'
+        node-version: '18'
+        cache: 'npm'
     
     - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install safety bandit
+      run: npm ci
     
-    - name: Run Safety check
+    - name: Run npm audit
       run: |
-        safety check --json --output safety-report.json || true
+        npm audit --audit-level=moderate --json > npm-audit-report.json || true
     
-    - name: Run Bandit security scan
-      run: |
-        bandit -r . -f json -o bandit-report.json || true
+    - name: Run Snyk security scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
     
     - name: Check for hardcoded secrets
       run: |
         # Check for potential hardcoded API keys or tokens
-        if grep -r "sk_" . --exclude-dir=.git; then
+        if grep -r "sk_" . --exclude-dir=.git --exclude-dir=node_modules; then
           echo "⚠ Potential hardcoded Stripe keys found"
         fi
-        if grep -r "pk_" . --exclude-dir=.git; then
+        if grep -r "pk_" . --exclude-dir=.git --exclude-dir=node_modules; then
           echo "⚠ Potential hardcoded public keys found"
         fi
-        if grep -r "eyJ" . --exclude-dir=.git; then
+        if grep -r "eyJ" . --exclude-dir=.git --exclude-dir=node_modules; then
           echo "⚠ Potential hardcoded JWT tokens found"
+        fi
+        if grep -r "mapbox" . --exclude-dir=.git --exclude-dir=node_modules | grep -v "process.env"; then
+          echo "⚠ Potential hardcoded Mapbox tokens found"
         fi
         echo "✓ No obvious hardcoded secrets found"
     
     - name: Check for exposed environment variables
       run: |
         # Check if env vars are being logged or exposed
-        if grep -r "print.*os.getenv" . --exclude-dir=.git; then
-          echo "⚠ Environment variables being printed - security risk"
+        if grep -r "console.log.*process.env" . --exclude-dir=.git --exclude-dir=node_modules; then
+          echo "⚠ Environment variables being logged - security risk"
         else
-          echo "✓ No environment variables being printed"
+          echo "✓ No environment variables being logged"
         fi
+    
+    - name: Check for TypeScript security issues
+      run: |
+        # Check for any security-related TypeScript issues
+        npx tsc --noEmit --strict --noUncheckedIndexedAccess || echo "TypeScript strict mode issues found"
+    
+    - name: Check for vulnerable dependencies
+      run: |
+        # Check for known vulnerable packages
+        npm audit --audit-level=moderate || echo "Vulnerable dependencies found"
     
     - name: Upload security reports
       uses: actions/upload-artifact@v4
       with:
         name: security-reports
         path: |
-          safety-report.json
-          bandit-report.json 
+          npm-audit-report.json 

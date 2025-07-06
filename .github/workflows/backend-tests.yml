@@ -4,9 +4,9 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'app.py'
-      - 'requirements.txt'
-      - 'api/**'
+      - 'app/api/**'
+      - 'package.json'
+      - 'next.config.js'
   pull_request:
     branches: [ main ]
 
@@ -17,70 +17,92 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
       with:
-        python-version: '3.11'
+        node-version: '18'
+        cache: 'npm'
     
-    - name: Cache pip dependencies
+    - name: Cache npm dependencies
       uses: actions/cache@v4
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-node-
     
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov requests flask-cors beautifulsoup4
+      run: npm ci
     
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: TypeScript type checking
+      run: npx tsc --noEmit
     
-    - name: Format check with black
-      run: |
-        pip install black
-        black --check --diff .
+    - name: ESLint check
+      run: npm run lint
     
-    - name: Test API endpoints
-      env:
-        MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN || 'test_token' }}
-        SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://test.supabase.co' }}
-        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'test_key' }}
+    - name: Test API routes structure
       run: |
-        python -m pytest tests/api/ -v --cov=app --cov-report=xml || echo "No API tests found yet"
+        # Check if API routes exist
+        if [ -d "app/api" ]; then
+          echo "✓ API routes directory exists"
+          ls -la app/api/
+        else
+          echo "✗ API routes directory not found"
+          exit 1
+        fi
+        
+        # Check for required API routes
+        if [ -f "app/api/messages/route.ts" ]; then
+          echo "✓ Messages API route exists"
+        else
+          echo "✗ Messages API route not found"
+          exit 1
+        fi
+        
+        if [ -f "app/api/mapbox-token/route.ts" ]; then
+          echo "✓ Mapbox token API route exists"
+        else
+          echo "✗ Mapbox token API route not found"
+          exit 1
+        fi
     
-    - name: Test Supabase connection
+    - name: Test API route syntax
+      run: |
+        # Check TypeScript syntax for API routes
+        for file in app/api/**/*.ts; do
+          if [ -f "$file" ]; then
+            npx tsc --noEmit "$file" && echo "✓ $file syntax is valid"
+          fi
+        done
+    
+    - name: Test Supabase integration
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       run: |
         if [ -z "$SUPABASE_URL" ]; then
-          echo "No Supabase secrets available, skipping connection test"
-          python -c "print('✓ Supabase connection test skipped (no secrets)')"
+          echo "No Supabase secrets available, skipping integration test"
+          echo "✓ Supabase integration test skipped (no secrets)"
         else
-          python -c "
-          import os
-          from dotenv import load_dotenv
-          load_dotenv()
+          # Test Supabase client creation
+          node -e "
+          const { createClient } = require('@supabase/supabase-js');
+          const url = process.env.SUPABASE_URL;
+          const key = process.env.SUPABASE_ANON_KEY;
           
-          from app import get_supabase_client
-          client = get_supabase_client()
-          if client:
-              print('✓ Supabase connection successful')
-          else:
-              print('✗ Supabase connection failed')
-              exit(1)
+          if (url && key) {
+            try {
+              const supabase = createClient(url, key);
+              console.log('✓ Supabase client created successfully');
+            } catch (error) {
+              console.error('✗ Supabase client creation failed:', error.message);
+              process.exit(1);
+            }
+          } else {
+            console.log('⚠ Supabase credentials not provided');
+          }
           "
         fi
     
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false 
+    - name: Build test
+      run: npm run build 

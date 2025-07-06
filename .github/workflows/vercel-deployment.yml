@@ -4,63 +4,98 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'static/**'
-      - 'templates/**'
+      - 'app/**'
+      - 'package.json'
+      - 'next.config.js'
       - 'vercel.json'
 
 jobs:
-  vercel-check:
+  vercel-deployment:
     runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install Vercel CLI
-      run: npm install --global vercel@latest
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: TypeScript type checking
+      run: npx tsc --noEmit
+    
+    - name: ESLint check
+      run: npm run lint
+    
+    - name: Build test
+      run: npm run build
     
     - name: Check Vercel configuration
       run: |
+        # Check if vercel.json exists and is valid
         if [ -f "vercel.json" ]; then
-          echo "✓ Vercel configuration found"
-          cat vercel.json
+          node -c vercel.json && echo "✓ vercel.json is valid"
         else
-          echo "⚠ No vercel.json found - using defaults"
+          echo "⚠ No vercel.json found (using Next.js defaults)"
         fi
     
-    - name: Check static files
+    - name: Check Next.js configuration
       run: |
-        echo "Checking static files..."
-        if [ -d "static" ]; then
-          echo "✓ Static directory found"
-          ls -la static/
+        # Check if next.config.js exists and is valid
+        if [ -f "next.config.js" ]; then
+          node -c next.config.js && echo "✓ next.config.js is valid"
         else
-          echo "⚠ No static directory found"
+          echo "✗ next.config.js not found"
+          exit 1
         fi
     
-    - name: Check templates
+    - name: Check environment variables
       run: |
-        echo "Checking templates..."
-        if [ -d "templates" ]; then
-          echo "✓ Templates directory found"
-          ls -la templates/
+        # Check for required environment variables in code
+        echo "Checking for environment variable usage..."
+        
+        if grep -r "process.env.NEXT_PUBLIC_MAPBOX_TOKEN" app/; then
+          echo "✓ NEXT_PUBLIC_MAPBOX_TOKEN usage found"
         else
-          echo "⚠ No templates directory found"
+          echo "⚠ NEXT_PUBLIC_MAPBOX_TOKEN usage not found"
+        fi
+        
+        if grep -r "process.env.SUPABASE_URL" app/; then
+          echo "✓ SUPABASE_URL usage found"
+        else
+          echo "⚠ SUPABASE_URL usage not found"
+        fi
+        
+        if grep -r "process.env.SUPABASE_ANON_KEY" app/; then
+          echo "✓ SUPABASE_ANON_KEY usage found"
+        else
+          echo "⚠ SUPABASE_ANON_KEY usage not found"
         fi
     
-    - name: Validate environment variables
+    - name: Check API routes
       run: |
-        echo "Checking for required environment variables..."
-        echo "The following should be set in Vercel dashboard:"
-        echo "- MAPBOX_TOKEN"
-        echo "- BACKEND_URL (if using separate backend)"
-        echo "- Any other API keys needed by frontend"
-    
-    - name: Test build process
-      run: |
-        echo "Testing if project structure is valid for Vercel..."
-        # Check if we have the basic structure for a static site
-        if [ -f "templates/index.html" ]; then
-          echo "✓ index.html template found"
+        # Verify API routes exist and are properly structured
+        if [ -d "app/api" ]; then
+          echo "✓ API routes directory exists"
+          find app/api -name "route.ts" -type f | while read file; do
+            echo "  - $file"
+          done
         else
-          echo "⚠ No index.html template found"
-        fi 
+          echo "✗ API routes directory not found"
+          exit 1
+        fi
+    
+    - name: Check static assets
+      run: |
+        # Check for any large static assets that might cause issues
+        echo "Checking static assets..."
+        find . -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" | while read file; do
+          size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+          if [ "$size" -gt 10485760 ]; then
+            echo "⚠ Large file found: $file ($size bytes)"
+          fi
+        done 
