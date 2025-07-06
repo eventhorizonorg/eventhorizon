@@ -19,7 +19,7 @@ export default function Home() {
       const initMap = async () => {
         // Create the map with dark preset for grey/black appearance
         map.current = new mapboxgl.Map({
-          container: mapContainer.current,
+          container: mapContainer.current!,
           style: 'mapbox://styles/mapbox/dark-v11',
           center: [0, 0],
           zoom: 1.5,
