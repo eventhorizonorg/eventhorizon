@@ -1,15 +1,15 @@
 # 🌍 SpectrumAtlas
 
-A globe-based visualization app using Mapbox, Supabase, and Flask, with a static frontend deployed on Vercel.
+A globe-based visualization app using Mapbox, Supabase, and Next.js, deployed on Vercel.
 
-[![CI/CD](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Backend%20API%20Tests/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
+[![CI/CD](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Next.js%20Application%20Tests/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
 [![Security](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Security%20Scan/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🚀 Quickstart
 
 ### Prerequisites
-- Python 3.11+
+- Node.js 18+
 - Mapbox access token
 - Supabase project
 
@@ -20,41 +20,40 @@ git clone https://github.com/danielsunyuan/spectrumatlas-webapp.git
 cd spectrumatlas-webapp
 
 # Install dependencies
-pip install -r requirements.txt
+npm install
 
 # Set up environment variables
-cp env.example .env
-# Edit .env with your actual values
+cp env.example .env.local
+# Edit .env.local with your actual values
 
 # Run the development server
-python run.py
+npm run dev
 ```
 
 ### Access the Application
-Open [http://localhost:8001](http://localhost:8001) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🏗️ Architecture
 
 ```
 spectrumatlas-webapp/
 ├── 📁 docs/           # Documentation
-├── 📁 tests/          # Test suite
-├── 📁 static/         # Frontend assets
-├── 📁 templates/      # HTML templates
+├── 📁 app/            # Next.js App Router
+│   ├── 📄 page.tsx    # Main globe component
+│   ├── 📄 layout.tsx  # Root layout
+│   └── 📁 api/        # API routes
 ├── 📁 .github/        # CI/CD workflows
-├── 🐍 app.py          # Flask application
-├── 🚀 run.py          # Development server
-├── 📋 requirements.txt # Python dependencies
-├── ⚙️ vercel.json     # Vercel configuration
+├── ⚙️ next.config.js  # Next.js configuration
+├── 📋 package.json    # Node.js dependencies
 └── 📖 README.md       # Project overview
 ```
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: HTML, JavaScript, Mapbox GL JS
-- **Backend**: Flask (Python)
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes
 - **Database**: Supabase
-- **Deployment**: Vercel (frontend)
+- **Deployment**: Vercel (Full Stack)
 - **CI/CD**: GitHub Actions
 
 ## 📚 Documentation
