@@ -1,5 +1,5 @@
 Flask==3.0.0
-Werkzeug==2.3.7
+Werkzeug>=3.0.0
 python-dotenv==1.0.0
 supabase==2.16.0
 flask-cors==4.0.0
