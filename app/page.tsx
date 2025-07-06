@@ -5,24 +5,18 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
 export default function Home() {
+  console.log('Page loaded')
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const pulseStart = useRef(Date.now())
 
   useEffect(() => {
     if (!mapContainer.current) return
-
-    const initMap = async () => {
-      try {
-        // Get Mapbox token from environment
-        const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-        if (!token) {
-          console.error('Mapbox token not configured')
-          return
-        }
-
-        mapboxgl.accessToken = token
-
+    const token = process.env.MAPBOX_TOKEN
+    console.log('Mapbox token:', token)
+    mapboxgl.accessToken = token || ''
+    try {
+      const initMap = async () => {
         // Create the map with dark preset for grey/black appearance
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
@@ -51,18 +45,17 @@ export default function Home() {
           // Start pulse animation
           animatePulse()
         })
-        
-      } catch (error) {
-        console.error('Error initializing map:', error)
       }
-    }
 
-    initMap()
+      initMap()
 
-    return () => {
-      if (map.current) {
-        map.current.remove()
+      return () => {
+        if (map.current) {
+          map.current.remove()
+        }
       }
+    } catch (error) {
+      console.error('Error initializing map:', error)
     }
   }, [])
 
@@ -226,7 +219,7 @@ export default function Home() {
       <div 
         ref={mapContainer} 
         className="absolute inset-0"
-        style={{ background: '#000000' }}
+        style={{ background: '#000000', height: '100vh', width: '100vw' }}
       />
     </div>
   )
