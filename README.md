@@ -1,9 +1,9 @@
-# 🌍 openconflict
+# 🌍 SpectrumAtlas
 
 A globe-based visualization app using Mapbox, Supabase, and Flask, with a static frontend deployed on Vercel.
 
-[![CI/CD](https://github.com/yourusername/openconflict/workflows/Backend%20API%20Tests/badge.svg)](https://github.com/yourusername/openconflict/actions)
-[![Security](https://github.com/yourusername/openconflict/workflows/Security%20Scan/badge.svg)](https://github.com/yourusername/openconflict/actions)
+[![CI/CD](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Backend%20API%20Tests/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
+[![Security](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Security%20Scan/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🚀 Quickstart
@@ -16,8 +16,8 @@ A globe-based visualization app using Mapbox, Supabase, and Flask, with a static
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/openconflict.git
-cd openconflict
+git clone https://github.com/danielsunyuan/spectrumatlas-webapp.git
+cd spectrumatlas-webapp
 
 # Install dependencies
 pip install -r requirements.txt
@@ -36,59 +36,37 @@ Open [http://localhost:8001](http://localhost:8001) in your browser.
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Vercel        │    │   GitHub        │    │   Flask         │
-│   (Frontend)    │◄──►│   Actions       │◄──►│   (Backend)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Mapbox        │    │   Supabase      │    │   Environment   │
-│   (Maps)        │    │   (Database)    │    │   Variables     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+spectrumatlas-webapp/
+├── 📁 docs/           # Documentation
+├── 📁 tests/          # Test suite
+├── 📁 static/         # Frontend assets
+├── 📁 templates/      # HTML templates
+├── 📁 .github/        # CI/CD workflows
+├── 🐍 app.py          # Flask application
+├── 🚀 run.py          # Development server
+├── 📋 requirements.txt # Python dependencies
+├── ⚙️ vercel.json     # Vercel configuration
+└── 📖 README.md       # Project overview
 ```
-
-## 📚 Documentation
-
-- **[📖 Project Docs](docs/README.md)** - Complete documentation
-- **[🌐 Frontend Guide](docs/frontend.md)** - Frontend development with Vercel
-- **[🔄 CI/CD Pipeline](docs/ci_cd.md)** - Continuous integration details
-- **[👥 Contributing](docs/contributing.md)** - How to contribute
-- **[📝 Cursor Rules](docs/cursor-rules.md)** - Development standards
 
 ## 🛠️ Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| **Frontend** | HTML/JS (MapboxGL), Vercel |
-| **Backend** | Flask (Python), Supabase |
-| **CI/CD** | GitHub Actions |
-| **Maps** | Mapbox GL JS |
-| **Database** | Supabase (PostgreSQL) |
+- **Frontend**: HTML, JavaScript, Mapbox GL JS
+- **Backend**: Flask (Python)
+- **Database**: Supabase
+- **Deployment**: Vercel (frontend)
+- **CI/CD**: GitHub Actions
 
-## 🧪 Testing
+## 📚 Documentation
 
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app
-
-# Run specific test categories
-pytest tests/api/          # API tests
-pytest tests/integration/  # Integration tests
-```
-
-## 🚀 Deployment
-
-- **Frontend**: Automatic deployment to Vercel on push to `main`
-- **Backend**: Deploy to your preferred platform (Heroku, Railway, etc.)
-- **Environment Variables**: Set in Vercel dashboard and backend platform
+- [Frontend Development](docs/frontend.md)
+- [CI/CD Pipeline](docs/ci_cd.md)
+- [Contributing Guide](docs/contributing.md)
+- [Cursor Rules](docs/cursor-rules.md)
 
 ## 🤝 Contributing
 
-See [docs/contributing.md](docs/contributing.md) for contribution guidelines.
+See [CONTRIBUTING.md](docs/contributing.md) for details.
 
 ## 📄 License
 

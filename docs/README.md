@@ -1,6 +1,6 @@
 # 📚 Documentation
 
-Welcome to the openconflict project documentation. This directory contains all project documentation organized for clarity and maintainability.
+Welcome to the SpectrumAtlas project documentation. This directory contains all project documentation organized for clarity and maintainability.
 
 ## 📖 Contents
 
@@ -20,7 +20,7 @@ Welcome to the openconflict project documentation. This directory contains all p
 ## 🏗️ Project Architecture
 
 ```
-openconflict/
+spectrumatlas-webapp/
 ├── 📁 docs/           # Documentation (this directory)
 ├── 📁 tests/          # Test suite
 ├── 📁 static/         # Frontend assets
