@@ -58,6 +58,7 @@ spectrumatlas-webapp/
 
 ## 📚 Documentation
 
+- [Deployment Guide](docs/deployment.md)
 - [Frontend Development](docs/frontend.md)
 - [CI/CD Pipeline](docs/ci_cd.md)
 - [Contributing Guide](docs/contributing.md)
