@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-export async function GET() {
+export async function POST(request: NextRequest) {
   try {
     const supabaseUrl = process.env.SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_ANON_KEY
@@ -15,29 +15,39 @@ export async function GET() {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
     
-    // Get messages with geolocation data and telegram_id for widget support
+    // Create a test message
+    const testMessage = {
+      text: `🧪 Test real-time message at ${new Date().toISOString()}`,
+      date: new Date().toISOString(),
+      channel: '@TestChannel',
+      latitude: 40.7128 + (Math.random() - 0.5) * 10, // Random around NYC
+      longitude: -74.0060 + (Math.random() - 0.5) * 10,
+      country_code: 'US',
+      telegram_id: '12345'
+    }
+    
+    // Insert test message
     const { data, error } = await supabase
       .from('messages')
-      .select('id, text, date, channel, latitude, longitude, country_code, telegram_id')
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null)
+      .insert([testMessage])
+      .select()
 
     if (error) {
       return NextResponse.json(
-        { error: `Failed to fetch messages: ${error.message}` },
+        { error: `Failed to insert test message: ${error.message}` },
         { status: 500 }
       )
     }
 
     return NextResponse.json({
       status: 'success',
-      messages: data,
-      count: data.length
+      message: 'Test message inserted',
+      data: data[0]
     })
     
   } catch (error) {
     return NextResponse.json(
-      { error: `Failed to fetch messages: ${error}` },
+      { error: `Failed to insert test message: ${error}` },
       { status: 500 }
     )
   }

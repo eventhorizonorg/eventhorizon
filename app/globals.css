@@ -65,4 +65,87 @@ body {
 }
 @keyframes fadeOutPopup {
   to { opacity: 0; }
+}
+
+/* Real-time notification animations */
+@keyframes notificationPulse {
+  0%, 100% {
+    box-shadow: 0 8px 32px rgba(255, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(255, 68, 68, 0.6);
+  }
+}
+
+@keyframes notificationSlideIn {
+  from {
+    transform: translateX(100%) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes notificationSlideOut {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+/* Line clamp utility for text truncation */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Telegram Widget Styles for Map Popups */
+.telegram-widget-container {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+  min-height: 200px;
+  position: relative;
+}
+
+.widget-loading {
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+  padding: 20px;
+}
+
+/* Ensure widget fits in popup */
+.mapboxgl-popup-content {
+  max-width: 400px !important;
+  max-height: 600px !important;
+  overflow-y: auto;
+}
+
+/* Style the embedded Telegram widget */
+.telegram-widget-container iframe {
+  border: none;
+  border-radius: 8px;
+  width: 100%;
+  min-height: 200px;
+}
+
+/* Mobile responsive for popup widgets */
+@media (max-width: 768px) {
+  .mapboxgl-popup-content {
+    max-width: 350px !important;
+    max-height: 500px !important;
+  }
+  
+  .telegram-widget-container {
+    min-height: 150px;
+  }
 } 
