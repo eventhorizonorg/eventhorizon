@@ -1,0 +1,108 @@
+name: Backend API Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'app/api/**'
+      - 'package.json'
+      - 'next.config.js'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: TypeScript type checking
+      run: npx tsc --noEmit
+    
+    - name: ESLint check
+      run: npm run lint
+    
+    - name: Test API routes structure
+      run: |
+        # Check if API routes exist
+        if [ -d "app/api" ]; then
+          echo "✓ API routes directory exists"
+          ls -la app/api/
+        else
+          echo "✗ API routes directory not found"
+          exit 1
+        fi
+        
+        # Check for required API routes
+        if [ -f "app/api/messages/route.ts" ]; then
+          echo "✓ Messages API route exists"
+        else
+          echo "✗ Messages API route not found"
+          exit 1
+        fi
+        
+        if [ -f "app/api/mapbox-token/route.ts" ]; then
+          echo "✓ Mapbox token API route exists"
+        else
+          echo "✗ Mapbox token API route not found"
+          exit 1
+        fi
+    
+    - name: Test API route syntax
+      run: |
+        # Check TypeScript syntax for API routes
+        for file in app/api/**/*.ts; do
+          if [ -f "$file" ]; then
+            npx tsc --noEmit "$file" && echo "✓ $file syntax is valid"
+          fi
+        done
+    
+    - name: Test Supabase integration
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      run: |
+        if [ -z "$SUPABASE_URL" ]; then
+          echo "No Supabase secrets available, skipping integration test"
+          echo "✓ Supabase integration test skipped (no secrets)"
+        else
+          # Test Supabase client creation
+          node -e "
+          const { createClient } = require('@supabase/supabase-js');
+          const url = process.env.SUPABASE_URL;
+          const key = process.env.SUPABASE_ANON_KEY;
+          
+          if (url && key) {
+            try {
+              const supabase = createClient(url, key);
+              console.log('✓ Supabase client created successfully');
+            } catch (error) {
+              console.error('✗ Supabase client creation failed:', error.message);
+              process.exit(1);
+            }
+          } else {
+            console.log('⚠ Supabase credentials not provided');
+          }
+          "
+        fi
+    
+    - name: Build test
+      run: npm run build 
