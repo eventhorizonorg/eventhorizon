@@ -76,4 +76,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Mapbox](https://www.mapbox.com/) for mapping capabilities
 - [Supabase](https://supabase.com/) for database and backend services
-- [Vercel](https://vercel.com/) for frontend hosting 
+- [Vercel](https://vercel.com/) for frontend hosting # Push mirror test
