@@ -7,6 +7,7 @@ Welcome to the SpectrumAtlas project documentation. This directory contains all 
 ### 🚀 Getting Started
 - **[Frontend Development](frontend.md)** - Guide for frontend development with Vercel
 - **[CI/CD Pipeline](ci_cd.md)** - Continuous integration and deployment details
+- **[Deployment Guide](deployment.md)** - Complete deployment instructions
 
 ### 👥 Contributing
 - **[Contributing Guide](contributing.md)** - How to contribute to the project
@@ -15,30 +16,28 @@ Welcome to the SpectrumAtlas project documentation. This directory contains all 
 ### 🔗 Quick Links
 - [Main README](../README.md) - Project overview and quickstart
 - [GitHub Workflows](../.github/workflows/) - CI/CD pipeline definitions
-- [Tests](../tests/) - Test suite and examples
 
 ## 🏗️ Project Architecture
 
 ```
 spectrumatlas-webapp/
 ├── 📁 docs/           # Documentation (this directory)
-├── 📁 tests/          # Test suite
-├── 📁 static/         # Frontend assets
-├── 📁 templates/      # HTML templates
+├── 📁 app/            # Next.js App Router
+│   ├── 📄 page.tsx    # Main globe component
+│   ├── 📄 layout.tsx  # Root layout
+│   └── 📁 api/        # API routes
 ├── 📁 .github/        # CI/CD workflows
-├── 🐍 app.py          # Flask application
-├── 🚀 run.py          # Development server
-├── 📋 requirements.txt # Python dependencies
-├── ⚙️ vercel.json     # Vercel configuration
+├── ⚙️ next.config.js  # Next.js configuration
+├── 📋 package.json    # Node.js dependencies
 └── 📖 README.md       # Project overview
 ```
 
 ## 🎯 Development Workflow
 
 1. **Local Development**: See [Frontend Guide](frontend.md)
-2. **Testing**: Run `pytest` from project root
+2. **Testing**: Run `npm test` from project root
 3. **CI/CD**: Automatic on push to main branch
-4. **Deployment**: Vercel for frontend, separate backend
+4. **Deployment**: Vercel for full-stack deployment
 
 ## 📝 Documentation Standards
 

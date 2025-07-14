@@ -3,7 +3,6 @@
 A globe-based visualization app using Mapbox, Supabase, and Next.js, deployed on Vercel.
 
 [![CI/CD](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Next.js%20Application%20Tests/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
-[![Security](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Security%20Scan/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🚀 Quickstart
@@ -56,6 +55,26 @@ spectrumatlas-webapp/
 - **Deployment**: Vercel (Full Stack)
 - **CI/CD**: GitHub Actions
 
+## 🔧 Key Features
+
+### **Real-time Globe Visualization**
+- Interactive 3D globe using Mapbox GL JS
+- Real-time message plotting with Supabase
+- Pulsing animations for new messages
+- Popup interactions with Telegram widget support
+
+### **Modern Development Stack**
+- **Next.js 14** with App Router for optimal performance
+- **TypeScript** for type safety and better DX
+- **Tailwind CSS** for rapid styling
+- **Supabase** for real-time database and authentication
+
+### **Deployment Benefits**
+- ✅ **Works perfectly on Vercel Hobby tier**
+- ✅ **Better performance** (React + TypeScript)
+- ✅ **Unlimited execution time** for API routes
+- ✅ **Cost-effective** (no separate backend hosting)
+
 ## 📚 Documentation
 
 - [Deployment Guide](docs/deployment.md)
@@ -76,4 +95,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Mapbox](https://www.mapbox.com/) for mapping capabilities
 - [Supabase](https://supabase.com/) for database and backend services
-- [Vercel](https://vercel.com/) for frontend hosting # Push mirror test
+- [Vercel](https://vercel.com/) for frontend hosting

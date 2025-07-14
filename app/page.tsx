@@ -26,8 +26,14 @@ interface Notification {
   isVisible: boolean
 }
 
+// Type for expanded popup state
+interface ExpandedPopup {
+  isOpen: boolean
+  message: NewMessage | null
+  position: { x: number; y: number } | null
+}
+
 export default function Home() {
-  console.log('Page loaded')
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const pulseStart = useRef(Date.now())
@@ -43,6 +49,13 @@ export default function Home() {
   const supabaseRef = useRef<any>(null)
   const subscriptionRef = useRef<any>(null)
 
+  // Expanded popup state
+  const [expandedPopup, setExpandedPopup] = useState<ExpandedPopup>({
+    isOpen: false,
+    message: null,
+    position: null
+  })
+
   // Initialize Supabase client
   useEffect(() => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -56,133 +69,15 @@ export default function Home() {
           }
         }
       })
-      console.log('Supabase client initialized for real-time')
     } else {
-      console.error('Missing Supabase environment variables for real-time')
+      console.error('❌ Missing Supabase environment variables for real-time')
       setRealtimeStatus('disabled')
     }
   }, [])
 
-  // Set up real-time subscription
+    // Real-time updates disabled due to WebSocket connection issues
   useEffect(() => {
-    if (!supabaseRef.current) {
-      console.log('Supabase client not available for real-time')
-      return
-    }
-
-    console.log('Setting up real-time subscription...')
-    
-    let retryCount = 0
-    const maxRetries = 3
-    
-    const setupRealtime = () => {
-      try {
-        // Create a unique channel name
-        const channelName = `messages-${Date.now()}`
-        
-        // Subscribe to new messages with proper error handling
-        subscriptionRef.current = supabaseRef.current
-          .channel(channelName)
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'messages',
-              filter: 'latitude=not.is.null AND longitude=not.is.null'
-            },
-            (payload: any) => {
-              console.log('New message received:', payload.new)
-              const newMessage = payload.new as NewMessage
-              
-              // Create notification
-              const notification: Notification = {
-                id: `notification-${Date.now()}-${Math.random()}`,
-                message: newMessage,
-                timestamp: Date.now(),
-                isVisible: true
-              }
-              
-              // Add to notifications
-              setNotifications(prev => [...prev, notification])
-              
-              // Add to map
-              addNewPointToMap(newMessage)
-              
-              // Auto-remove notification after 8 seconds
-              setTimeout(() => {
-                setNotifications(prev => 
-                  prev.map(n => 
-                    n.id === notification.id 
-                      ? { ...n, isVisible: false }
-                      : n
-                  )
-                )
-              }, 8000)
-              
-              // Remove from state after animation
-              setTimeout(() => {
-                setNotifications(prev => prev.filter(n => n.id !== notification.id))
-              }, 8500)
-            }
-          )
-          .subscribe((status: any) => {
-            console.log('Real-time subscription status:', status)
-            if (status === 'SUBSCRIBED') {
-              console.log('✅ Real-time subscription active')
-              setRealtimeStatus('connected')
-              retryCount = 0 // Reset retry count on success
-            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              console.log('❌ Real-time subscription failed:', status)
-              setRealtimeStatus('failed')
-              handleRealtimeError()
-            } else if (status === 'CLOSED') {
-              console.log('🔌 Real-time subscription closed')
-              setRealtimeStatus('failed')
-              handleRealtimeError()
-            }
-          })
-
-      } catch (error) {
-        console.error('Error setting up real-time subscription:', error)
-        handleRealtimeError()
-      }
-    }
-
-    const handleRealtimeError = () => {
-      retryCount++
-      if (retryCount <= maxRetries) {
-        console.log(`🔄 Retrying real-time connection (${retryCount}/${maxRetries})...`)
-        setRealtimeStatus('connecting')
-        setTimeout(() => {
-          if (subscriptionRef.current) {
-            try {
-              supabaseRef.current.removeChannel(subscriptionRef.current)
-            } catch (error) {
-              console.log('Error removing channel:', error)
-            }
-          }
-          setupRealtime()
-        }, 2000 * retryCount) // Exponential backoff
-      } else {
-        console.log('❌ Max retries reached, continuing without real-time updates')
-        console.log('💡 Real-time updates disabled. Map will still work normally.')
-        setRealtimeStatus('disabled')
-      }
-    }
-
-    setupRealtime()
-
-    return () => {
-      if (subscriptionRef.current) {
-        console.log('Cleaning up real-time subscription')
-        try {
-          supabaseRef.current.removeChannel(subscriptionRef.current)
-        } catch (error) {
-          console.log('Error cleaning up subscription:', error)
-        }
-      }
-    }
+    setRealtimeStatus('disabled')
   }, [])
 
   // Add new point to map
@@ -201,72 +96,71 @@ export default function Home() {
         text: newMessage.text,
         date: newMessage.date,
         channel: newMessage.channel,
+        latitude: newMessage.latitude,
+        longitude: newMessage.longitude,
         country_code: newMessage.country_code,
         telegram_id: newMessage.telegram_id,
-        phase: Math.random() * 2 * Math.PI,
-        isNew: true // Flag for special animation
+        pulse: 0.5,
+        phase: Math.random() * Math.PI * 2
       }
     }
 
-    // Add to existing geojson
+    // Add to geojson
     const currentGeojson = geojsonRef.current
     currentGeojson.features.push(newFeature)
-    geojsonRef.current = currentGeojson
-
-    // Update map source
     ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(currentGeojson)
-    
-    console.log('New point added to map:', newMessage.channel)
   }
 
-  // Reset idle timer on user activity
+  // Handle expanded popup open
+  const openExpandedPopup = (message: NewMessage, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    
+    setExpandedPopup({
+      isOpen: true,
+      message,
+      position: { x: event.clientX, y: event.clientY }
+    })
+  }
+
+  // Handle expanded popup close
+  const closeExpandedPopup = () => {
+    setExpandedPopup({
+      isOpen: false,
+      message: null,
+      position: null
+    })
+  }
+
+  // Reset idle timer
   const resetIdleTimer = () => {
-    console.log('Activity detected, resetting idle timer')
     if (idleTimerRef.current) {
       clearTimeout(idleTimerRef.current)
     }
-    
-    if (isIdle) {
-      console.log('Stopping idle rotation')
-      setIsIdle(false)
-      // Stop rotation animation
-      if (rotationAnimationRef.current) {
-        cancelAnimationFrame(rotationAnimationRef.current)
-        rotationAnimationRef.current = null
-      }
-    }
-    
-    // Start new idle timer (10 seconds)
+    setIsIdle(false)
     idleTimerRef.current = setTimeout(() => {
-      console.log('Idle timeout reached, starting rotation')
       setIsIdle(true)
       startIdleRotation()
-    }, 10000)
+    }, 30000) // 30 seconds
   }
 
-  // Start slow rotation animation
+  // Start idle rotation
   const startIdleRotation = () => {
-    console.log('Starting idle rotation animation')
-    if (!map.current) {
-      console.log('Map not ready for rotation')
-      return
-    }
+    if (!map.current) return
     
     rotationStartTime.current = Date.now()
+    
     const animateRotation = () => {
-      if (!map.current || !isIdle) {
-        console.log('Stopping rotation: map not ready or not idle')
-        return
-      }
+      if (!map.current || !isIdle) return
       
       const elapsed = Date.now() - rotationStartTime.current
-      const rotationSpeed = 0.0001 // Very slow rotation (degrees per millisecond)
-      const newBearing = (elapsed * rotationSpeed) % 360
+      const rotationSpeed = 0.1 // degrees per second
+      const currentBearing = map.current.getBearing()
+      const newBearing = currentBearing + rotationSpeed
       
-      console.log(`Rotating to bearing: ${newBearing.toFixed(2)}°`)
       map.current.easeTo({
         bearing: newBearing,
-        duration: 0 // Instant update for smooth animation
+        duration: 1000
       })
       
       rotationAnimationRef.current = requestAnimationFrame(animateRotation)
@@ -275,41 +169,37 @@ export default function Home() {
     animateRotation()
   }
 
-  // Set up activity listeners
+  // Handle user activity
   useEffect(() => {
     const handleActivity = () => resetIdleTimer()
     
-    // Listen for various user activities
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+    // Add event listeners for user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
     events.forEach(event => {
-      document.addEventListener(event, handleActivity, true)
+      document.addEventListener(event, handleActivity)
     })
-    
-    // Start initial idle timer
-    console.log('Setting up initial idle timer')
-    resetIdleTimer()
     
     return () => {
       events.forEach(event => {
-        document.removeEventListener(event, handleActivity, true)
+        document.removeEventListener(event, handleActivity)
       })
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current)
-      }
-      if (rotationAnimationRef.current) {
-        cancelAnimationFrame(rotationAnimationRef.current)
-      }
     }
-  }, [isIdle])
+  }, [])
 
+  // Initialize map and load data
   useEffect(() => {
     if (!mapContainer.current) return
-    const token = process.env.MAPBOX_TOKEN
-    console.log('Mapbox token:', token)
-    mapboxgl.accessToken = token || ''
-    try {
-      const initMap = async () => {
-        // Create the map with dark preset for grey/black appearance
+
+    const initMap = async () => {
+      try {
+        const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+        if (!token) {
+          console.error('Mapbox token not found')
+          return
+        }
+        
+        mapboxgl.accessToken = token
+        
         map.current = new mapboxgl.Map({
           container: mapContainer.current!,
           style: 'mapbox://styles/mapbox/dark-v11',
@@ -320,99 +210,103 @@ export default function Home() {
           bearing: 0
         })
 
-        map.current.on('load', async () => {
-          // Set fog for space background
-          map.current?.setFog({
-            'color': '#000000',
-            'high-color': '#000000',
-            'horizon-blend': 0.0,
-            'space-color': '#000000',
-            'star-intensity': 0.3
-          })
-          map.current?.setPaintProperty('water', 'fill-color', '#0a0a0a')
-          map.current?.setPaintProperty('water', 'fill-opacity', 0.8)
-          
-          // Load and plot messages
-          await loadAndPlotMessages()
-          // Start pulse animation
+        map.current.on('load', () => {
+          loadAndPlotMessages()
           animatePulse()
         })
 
-        // Reset idle timer on map interactions
-        map.current.on('movestart', resetIdleTimer)
-        map.current.on('zoomstart', resetIdleTimer)
-      }
+        map.current.on('error', (e) => {
+          console.error('Map error:', e)
+        })
 
-      initMap()
-
-      return () => {
-        if (map.current) {
-          map.current.remove()
+        return () => {
+          if (map.current) {
+            map.current.remove()
+          }
         }
+      } catch (error) {
+        console.error('Error initializing map:', error)
       }
-    } catch (error) {
-      console.error('Error initializing map:', error)
     }
+
+    initMap()
   }, [])
 
+  // Load and plot messages
   const loadAndPlotMessages = async () => {
     try {
-      console.log('Loading messages from API...')
       const response = await fetch('/api/messages')
-      const data = await response.json()
-      
-      if (data.error) {
-        console.error('Failed to load messages:', data.error)
-        return
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
-
-      console.log(`Loaded ${data.messages.length} messages from API`)
-
-      // Convert to GeoJSON FeatureCollection
-      const features: Feature<Point>[] = data.messages.map((msg: any, i: number) => ({
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [msg.longitude, msg.latitude]
-        },
-        properties: {
-          id: msg.id,
-          text: msg.text,
-          date: msg.date,
-          channel: msg.channel,
-          country_code: msg.country_code,
-          telegram_id: msg.telegram_id,
-          phase: (i * 2 * Math.PI) / data.messages.length
-        }
-      }))
-
+      
+      const responseData = await response.json()
+      
+      if (!responseData.messages || !Array.isArray(responseData.messages)) {
+        throw new Error('Invalid response format: messages array not found')
+      }
+      
+      const messages = responseData.messages
+      
       const geojson: FeatureCollection<Point> = {
         type: 'FeatureCollection',
-        features
+        features: messages.map((msg: any) => ({
+          type: 'Feature' as const,
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [msg.longitude, msg.latitude]
+          },
+          properties: {
+            id: msg.id,
+            text: msg.text,
+            date: msg.date,
+            channel: msg.channel,
+            latitude: msg.latitude,
+            longitude: msg.longitude,
+            country_code: msg.country_code,
+            telegram_id: msg.telegram_id,
+            pulse: 0.5,
+            phase: Math.random() * Math.PI * 2
+          }
+        }))
       }
+      
       geojsonRef.current = geojson
-
-      console.log(`Created ${geojson.features.length} GeoJSON features`)
-
-      if (!map.current) {
-        console.error('Map not available for plotting messages')
-        return
-      }
-
-      console.log('Adding source to map...')
-      // Add source
-      if (map.current.getSource('telegram-points')) {
-        console.log('Updating existing source...')
+      
+      if (map.current && map.current.getSource('telegram-points')) {
         ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(geojson)
-      } else {
-        console.log('Creating new source...')
+      } else if (map.current) {
         map.current.addSource('telegram-points', {
           type: 'geojson',
           data: geojson
         })
 
-        console.log('Adding circle layer...')
-        // Add circle layer
+        // Add glow layer first (behind the main points)
+        map.current.addLayer({
+          id: 'telegram-points-glow',
+          type: 'circle',
+          source: 'telegram-points',
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              0, 6,
+              8, 12
+            ],
+            'circle-color': '#ffffff',
+            'circle-opacity': [
+              'interpolate',
+              ['linear'],
+              ['get', 'pulse'],
+              0, 0.05,
+              1, 0.15
+            ],
+            'circle-stroke-width': 0
+          }
+        })
+
+        // Add main points layer
         map.current.addLayer({
           id: 'telegram-points-layer',
           type: 'circle',
@@ -421,163 +315,240 @@ export default function Home() {
             'circle-radius': [
               'interpolate',
               ['linear'],
-              ['get', 'pulse'],
-              0, 5,
-              1, 10
+              ['zoom'],
+              0, 2,
+              8, 4
             ],
-            'circle-color': '#ffffff', // Always white for existing points
-            'circle-blur': [
+            'circle-color': '#ffffff',
+            'circle-opacity': [
               'interpolate',
               ['linear'],
               ['get', 'pulse'],
               0, 0.2,
-              1, 0.7
+              1, 0.6
             ],
-            'circle-opacity': 0.9,
-            'circle-stroke-width': 0,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-opacity': [
+              'interpolate',
+              ['linear'],
+              ['get', 'pulse'],
+              0, 0.1,
+              1, 0.4
+            ]
           }
         })
-      }
 
-      console.log('Map points added successfully!')
+        // Create popup
+        const hoverPopup = new mapboxgl.Popup({
+          closeButton: true,
+          closeOnClick: false,
+          maxWidth: '400px'
+        })
 
-      // Add popup on hover
-      let hoverPopup = new mapboxgl.Popup({ closeButton: true, maxWidth: '300px' })
-      let popupOpen = false
-      let popupShouldClose = false
+        let popupOpen = false
+        let popupShouldClose = true
 
-      const closePopupWithFade = () => {
-        const popupEl = document.querySelector('.mapboxgl-popup-content .fade-in')
-        if (popupEl) {
-          popupEl.classList.remove('fade-in')
-          popupEl.classList.add('fade-out')
-          setTimeout(() => hoverPopup.remove(), 200)
-        } else {
-          hoverPopup.remove()
-        }
-        popupOpen = false
-      }
-
-      map.current.on('mouseenter', 'telegram-points-layer', (e) => {
-        map.current!.getCanvas().style.cursor = 'pointer'
-        const feature = e.features![0]
-        const props = feature.properties!
-        let coordinates: [number, number] = [0, 0]
-        if (feature.geometry.type === 'Point') {
-          const coords = (feature.geometry as Point).coordinates
-          if (Array.isArray(coords) && coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
-            coordinates = [coords[0], coords[1]]
+        const closePopupWithFade = () => {
+          if (hoverPopup.isOpen()) {
+            const popupElement = hoverPopup.getElement()
+            if (popupElement) {
+              popupElement.classList.add('fade-out')
+              setTimeout(() => {
+                hoverPopup.remove()
+                popupOpen = false
+              }, 200)
+            }
           }
         }
-        
-        let locationString = 'Unknown';
-        if (
-          Array.isArray(coordinates) &&
-          coordinates.length === 2 &&
-          typeof coordinates[0] === 'number' &&
-          typeof coordinates[1] === 'number' &&
-          !isNaN(coordinates[0]) &&
-          !isNaN(coordinates[1])
-        ) {
-          locationString = `${coordinates[1].toFixed(4)}, ${coordinates[0].toFixed(4)}`;
-        }
-        // Check if we have telegram_id for widget embedding
-        const hasTelegramId = props.telegram_id && props.telegram_id !== 'null'
-        const cleanChannel = String(props.channel).replace('@', '')
-        
-        const popupContent = `
-          <div class="message-popup fade-in" id="telegram-hover-popup">
-            <h4>📢 ${String(props.channel)}</h4>
-            <p><strong>Date:</strong> ${new Date(String(props.date)).toLocaleString()}</p>
-            <p><strong>Location:</strong> ${locationString}</p>
-            ${props.country_code ? `<p><strong>Country:</strong> ${String(props.country_code)}</p>` : ''}
-            <div class="message-text">
-              <strong>Message:</strong><br>
-              ${String(props.text)}
-            </div>
-            ${hasTelegramId ? `
-              <div class="telegram-widget-container">
-                <div class="widget-loading">Loading Telegram post...</div>
-                <script async src="https://telegram.org/js/telegram-widget.js?1" 
-                        data-telegram-post="${cleanChannel}/${props.telegram_id}" 
-                        data-width="100%" 
-                        data-author-photo="true"
-                        data-dark="1"></script>
+
+        map.current.on('mouseenter', 'telegram-points-layer', (e) => {
+          if (!e.features || e.features.length === 0) return
+          
+          map.current!.getCanvas().style.cursor = 'pointer'
+          popupShouldClose = false
+          
+          const feature = e.features[0]
+          const props = feature.properties
+          if (!props) return
+          
+          let coordinates: [number, number] = [0, 0]
+          if (feature.geometry.type === 'Point') {
+            const coords = feature.geometry.coordinates
+            if (Array.isArray(coords) && coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+              coordinates = [coords[0], coords[1]]
+            }
+          }
+          
+          let locationString = 'Unknown';
+          if (
+            Array.isArray(coordinates) &&
+            coordinates.length === 2 &&
+            typeof coordinates[0] === 'number' &&
+            typeof coordinates[1] === 'number' &&
+            !isNaN(coordinates[0]) &&
+            !isNaN(coordinates[1])
+          ) {
+            locationString = `${coordinates[1].toFixed(4)}, ${coordinates[0].toFixed(4)}`;
+          }
+          
+          // Check if we have telegram_id for widget embedding
+          const hasTelegramId = props.telegram_id && props.telegram_id !== 'null'
+          const cleanChannel = String(props.channel).replace('@', '')
+          
+          // Truncate text for popup preview
+          const truncatedText = String(props.text).length > 150 
+            ? String(props.text).substring(0, 150) + '...'
+            : String(props.text)
+          
+          const popupContent = `
+            <div class="message-popup fade-in" id="telegram-hover-popup">
+              <h4>📢 ${String(props.channel)}</h4>
+              <p><strong>Date:</strong> ${new Date(String(props.date)).toLocaleString()}</p>
+              <p><strong>Location:</strong> ${locationString}</p>
+              ${props.country_code ? `<p><strong>Country:</strong> ${String(props.country_code)}</p>` : ''}
+              <div class="message-text">
+                <strong>Message:</strong><br>
+                ${truncatedText}
+                ${String(props.text).length > 150 ? `
+                  <br><br>
+                  <button class="read-more-btn" onclick="window.openExpandedPopup(${JSON.stringify({
+                    id: props.id,
+                    text: props.text,
+                    date: props.date,
+                    channel: props.channel,
+                    latitude: props.latitude,
+                    longitude: props.longitude,
+                    country_code: props.country_code,
+                    telegram_id: props.telegram_id
+                  }).replace(/"/g, '&quot;')})">
+                    📖 Read Full Message
+                  </button>
+                ` : ''}
               </div>
-            ` : ''}
-          </div>
-        `
-        
-        hoverPopup.setLngLat(coordinates as [number, number]).setHTML(popupContent).addTo(map.current!)
-        popupOpen = true
-        popupShouldClose = false
-        
-        setTimeout(() => {
-          const popupDiv = document.getElementById('telegram-hover-popup')
-          if (popupDiv) {
-            popupDiv.addEventListener('mouseenter', () => {
-              popupShouldClose = false
+              ${hasTelegramId ? `
+                <div class="telegram-widget-container">
+                  <div class="widget-loading">Loading Telegram post...</div>
+                  <script async src="https://telegram.org/js/telegram-widget.js?1" 
+                          data-telegram-post="${cleanChannel}/${props.telegram_id}" 
+                          data-width="100%" 
+                          data-author-photo="true"
+                          data-dark="1"></script>
+                </div>
+              ` : ''}
+            </div>
+          `
+          
+          hoverPopup.setLngLat(coordinates as [number, number]).setHTML(popupContent).addTo(map.current!)
+          popupOpen = true
+          popupShouldClose = false
+          
+          // Make the openExpandedPopup function available globally
+          ;(window as any).openExpandedPopup = (messageData: any) => {
+            const message: NewMessage = {
+              id: messageData.id,
+              text: messageData.text,
+              date: messageData.date,
+              channel: messageData.channel,
+              latitude: messageData.latitude,
+              longitude: messageData.longitude,
+              country_code: messageData.country_code,
+              telegram_id: messageData.telegram_id
+            }
+            setExpandedPopup({
+              isOpen: true,
+              message,
+              position: null
             })
-            popupDiv.addEventListener('mouseleave', () => {
-              popupShouldClose = true
-              setTimeout(() => {
-                if (popupShouldClose) closePopupWithFade()
-              }, 10)
-            })
-            
-            // Handle widget loading and errors
-            if (hasTelegramId) {
-              const widgetContainer = popupDiv.querySelector('.telegram-widget-container')
-              if (widgetContainer) {
-                const script = widgetContainer.querySelector('script')
-                if (script) {
-                  script.onerror = () => {
-                    const loadingDiv = widgetContainer.querySelector('.widget-loading')
-                    if (loadingDiv) {
-                      loadingDiv.innerHTML = `
-                        <div style="text-align: center; color: #dc3545; padding: 20px;">
-                          <p>Failed to load Telegram post</p>
-                          <a href="https://t.me/${cleanChannel}/${props.telegram_id}" 
-                             target="_blank" 
-                             rel="noopener noreferrer"
-                             style="color: #0088cc; text-decoration: none;">
-                            View on Telegram
-                          </a>
-                        </div>
-                      `
+          }
+          
+          setTimeout(() => {
+            const popupDiv = document.getElementById('telegram-hover-popup')
+            if (popupDiv) {
+              popupDiv.addEventListener('mouseenter', () => {
+                popupShouldClose = false
+              })
+              popupDiv.addEventListener('mouseleave', () => {
+                popupShouldClose = true
+                setTimeout(() => {
+                  if (popupShouldClose) closePopupWithFade()
+                }, 10)
+              })
+              
+              // Handle widget loading and errors
+              if (hasTelegramId) {
+                const widgetContainer = popupDiv.querySelector('.telegram-widget-container')
+                if (widgetContainer) {
+                  const script = widgetContainer.querySelector('script')
+                  if (script) {
+                    script.onerror = () => {
+                      const loadingDiv = widgetContainer.querySelector('.widget-loading')
+                      if (loadingDiv) {
+                        loadingDiv.innerHTML = `
+                          <div style="text-align: center; color: #dc3545; padding: 20px;">
+                            <p>Failed to load Telegram post</p>
+                            <a href="https://t.me/${cleanChannel}/${props.telegram_id}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               style="color: #0088cc; text-decoration: none;">
+                              View on Telegram
+                            </a>
+                          </div>
+                        `
+                      }
                     }
+                    
+                    // Remove loading text when widget loads
+                    setTimeout(() => {
+                      const loadingDiv = widgetContainer.querySelector('.widget-loading') as HTMLElement
+                      if (loadingDiv) {
+                        loadingDiv.style.display = 'none'
+                      }
+                    }, 3000)
                   }
-                  
-                  // Remove loading text when widget loads
-                  setTimeout(() => {
-                    const loadingDiv = widgetContainer.querySelector('.widget-loading') as HTMLElement
-                    if (loadingDiv) {
-                      loadingDiv.style.display = 'none'
-                    }
-                  }, 3000)
                 }
               }
             }
-          }
-        }, 10)
-      })
+          }, 10)
+        })
 
-      map.current.on('mouseleave', 'telegram-points-layer', () => {
-        map.current!.getCanvas().style.cursor = ''
-        popupShouldClose = true
-        setTimeout(() => {
-          if (popupShouldClose && popupOpen) closePopupWithFade()
-        }, 10)
-      })
+        map.current.on('mouseleave', 'telegram-points-layer', () => {
+          map.current!.getCanvas().style.cursor = ''
+          popupShouldClose = true
+          setTimeout(() => {
+            if (popupShouldClose && popupOpen) closePopupWithFade()
+          }, 10)
+        })
 
+        // Also handle hover for glow layer
+        map.current.on('mouseenter', 'telegram-points-glow', (e) => {
+          if (!e.features || e.features.length === 0) return
+          map.current!.getCanvas().style.cursor = 'pointer'
+        })
+        
+        map.current.on('mouseleave', 'telegram-points-glow', () => {
+          map.current!.getCanvas().style.cursor = ''
+        })
+      }
     } catch (error) {
-      console.error('Error loading messages:', error)
+      console.error('❌ Error loading messages:', error)
+      console.error('🔍 Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      })
     }
   }
 
   const animatePulse = () => {
-    if (!map.current || !map.current.getSource('telegram-points')) return
+    if (!map.current || !map.current.getSource('telegram-points')) {
+      return
+    }
+    
     const geojson = geojsonRef.current
+    if (!geojson.features || geojson.features.length === 0) {
+      return
+    }
+    
     const now = Date.now()
     const t = ((now - pulseStart.current) / 1000) % 2 // 2s period
     
@@ -586,8 +557,12 @@ export default function Home() {
       f.properties.pulse = 0.5 * (1 + Math.sin(2 * Math.PI * t / 2 + phase))
     })
     
-    ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(geojson)
-    requestAnimationFrame(animatePulse)
+    try {
+      ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(geojson)
+      requestAnimationFrame(animatePulse)
+    } catch (error) {
+      console.error('❌ Error updating map data:', error)
+    }
   }
 
   return (
@@ -595,7 +570,11 @@ export default function Home() {
       <div 
         ref={mapContainer} 
         className="absolute inset-0"
-        style={{ background: '#000000', height: '100vh', width: '100vw' }}
+        style={{ 
+          background: '#000000', 
+          height: '100vh', 
+          width: '100vw'
+        }}
       />
       
       {/* Real-time notifications overlay */}
@@ -604,7 +583,7 @@ export default function Home() {
           <div
             key={notification.id}
             className={`
-              bg-black/80 backdrop-blur-sm border border-red-500/50 rounded-lg p-4 max-w-sm
+              bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 max-w-sm
               transform transition-all duration-500 ease-out pointer-events-auto
               ${notification.isVisible 
                 ? 'translate-x-0 opacity-100 scale-100' 
@@ -612,17 +591,17 @@ export default function Home() {
               }
             `}
             style={{
-              boxShadow: '0 8px 32px rgba(255, 68, 68, 0.3)',
+              boxShadow: '0 8px 32px rgba(255, 255, 255, 0.1)',
               animation: notification.isVisible ? 'notificationPulse 2s ease-in-out' : 'none'
             }}
           >
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-red-400 text-sm font-semibold">
+                  <span className="text-white text-sm font-semibold">
                     📢 {notification.message.channel}
                   </span>
                   <span className="text-gray-400 text-xs">
@@ -662,6 +641,113 @@ export default function Home() {
           </span>
         </div>
       </div>
+
+      {/* Expanded Popup Overlay */}
+      {expandedPopup.isOpen && expandedPopup.message && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={closeExpandedPopup}
+          />
+          
+          {/* Expanded Popup Content */}
+          <div className="relative bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                          <div className="flex items-center space-x-3">
+              <div className="w-3 h-3 bg-white rounded-full"></div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  📢 {expandedPopup.message.channel}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {new Date(expandedPopup.message.date).toLocaleString()}
+                </p>
+              </div>
+            </div>
+              <button
+                onClick={closeExpandedPopup}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {/* Message Details */}
+              <div className="mb-6">
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                  <div>
+                    <span className="font-medium">Location:</span>
+                    <br />
+                    {expandedPopup.message.latitude.toFixed(4)}, {expandedPopup.message.longitude.toFixed(4)}
+                  </div>
+                  {expandedPopup.message.country_code && (
+                    <div>
+                      <span className="font-medium">Country:</span>
+                      <br />
+                      {expandedPopup.message.country_code}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Full Message Text */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Full Message:</h4>
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {expandedPopup.message.text}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Telegram Widget */}
+              {expandedPopup.message.telegram_id && expandedPopup.message.telegram_id !== 'null' && (
+                <div className="border-t border-gray-200 pt-6">
+                  <h4 className="font-medium text-gray-900 mb-4">Telegram Post:</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="telegram-widget-container">
+                      <div className="widget-loading">Loading Telegram post...</div>
+                      <script 
+                        async 
+                        src="https://telegram.org/js/telegram-widget.js?1" 
+                        data-telegram-post={`${String(expandedPopup.message.channel).replace('@', '')}/${expandedPopup.message.telegram_id}`}
+                        data-width="100%" 
+                        data-author-photo="true"
+                        data-dark="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+              <div className="text-sm text-gray-500">
+                Click outside to close
+              </div>
+              {expandedPopup.message.telegram_id && expandedPopup.message.telegram_id !== 'null' && (
+                <a
+                  href={`https://t.me/${String(expandedPopup.message.channel).replace('@', '')}/${expandedPopup.message.telegram_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
+                  </svg>
+                  View on Telegram
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

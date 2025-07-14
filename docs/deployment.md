@@ -39,7 +39,7 @@ Add these secrets in your GitHub repository:
 
 ### 3. Deployment Workflow
 
-The deployment workflow (`deploy-vercel.yml`) automatically:
+The deployment workflow (`vercel-deployment.yml`) automatically:
 
 - **On PR:** Creates preview deployments
 - **On main push:** Deploys to production
