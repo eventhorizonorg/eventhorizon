@@ -1,6 +1,6 @@
 # Cursor Rules
 
-These rules help keep the SpectrumAtlas project consistent and maintainable, especially for frontend development.
+These rules help keep the Event Horizon project consistent and maintainable, especially for frontend development.
 
 ## 📋 Overview
 
@@ -135,7 +135,7 @@ pytest
 ## 📁 File Organization
 
 ```
-spectrumatlas-webapp/
+eventhorizon-webapp/
 ├── 📁 docs/           # Documentation
 ├── 📁 tests/          # Test suite
 ├── 📁 static/         # Frontend assets

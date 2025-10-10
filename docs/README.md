@@ -1,6 +1,6 @@
 # 📚 Documentation
 
-Welcome to the SpectrumAtlas project documentation. This directory contains all project documentation organized for clarity and maintainability.
+Welcome to the Event Horizon project documentation. This directory contains all project documentation organized for clarity and maintainability.
 
 ## 📖 Contents
 
@@ -20,7 +20,7 @@ Welcome to the SpectrumAtlas project documentation. This directory contains all 
 ## 🏗️ Project Architecture
 
 ```
-spectrumatlas-webapp/
+eventhorizon-webapp/
 ├── 📁 docs/           # Documentation (this directory)
 ├── 📁 app/            # Next.js App Router
 │   ├── 📄 page.tsx    # Main globe component

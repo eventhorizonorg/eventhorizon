@@ -1,8 +1,8 @@
-# 🌍 SpectrumAtlas
+# 🌍 Event Horizon
 
 A globe-based visualization app using Mapbox, Supabase, and Next.js, deployed on Vercel.
 
-[![CI/CD](https://github.com/danielsunyuan/spectrumatlas-webapp/workflows/Next.js%20Application%20Tests/badge.svg)](https://github.com/danielsunyuan/spectrumatlas-webapp/actions)
+[![CI/CD](https://github.com/danielsunyuan/eventhorizon-webapp/workflows/Next.js%20Application%20Tests/badge.svg)](https://github.com/danielsunyuan/eventhorizon-webapp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🚀 Quickstart
@@ -15,8 +15,8 @@ A globe-based visualization app using Mapbox, Supabase, and Next.js, deployed on
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/danielsunyuan/spectrumatlas-webapp.git
-cd spectrumatlas-webapp
+git clone https://github.com/danielsunyuan/eventhorizon-webapp.git
+cd eventhorizon-webapp
 
 # Install dependencies
 npm install
@@ -35,7 +35,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## 🏗️ Architecture
 
 ```
-spectrumatlas-webapp/
+eventhorizon-webapp/
 ├── 📁 docs/           # Documentation
 ├── 📁 app/            # Next.js App Router
 │   ├── 📄 page.tsx    # Main globe component
