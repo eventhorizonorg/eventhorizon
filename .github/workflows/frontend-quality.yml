@@ -2,76 +2,119 @@ name: Frontend Quality Check
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
       - 'app/**'
       - 'package.json'
-      - 'next.config.js'
-      - 'tailwind.config.ts'
+      - 'next.config.*'
+      - 'tailwind.config.*'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'app/**'
       - 'package.json'
+      - 'next.config.*'
+
+permissions:
+  contents: read
 
 jobs:
   frontend-quality:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 20
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: TypeScript type checking
-      run: npx tsc --noEmit
-    
-    - name: ESLint check
-      run: npm run lint
-    
-    - name: Check for console errors
-      run: |
-        # Check for console.log statements in production code
-        if grep -r "console.log" app/ --exclude="*.test.*" --exclude="*.spec.*"; then
-          echo "Warning: console.log statements found in app files"
-        else
-          echo "✓ No console.log statements found in app files"
-        fi
-    
-    - name: Validate Next.js configuration
-      run: |
-        # Check if next.config.js exists and is valid
-        if [ -f "next.config.js" ]; then
-          node -c next.config.js && echo "✓ next.config.js is valid"
-        else
-          echo "✗ next.config.js not found"
-          exit 1
-        fi
-    
-    - name: Check for Mapbox token usage
-      run: |
-        # Ensure Mapbox token is being used from environment
-        if grep -r "process.env.NEXT_PUBLIC_MAPBOX_TOKEN" app/; then
-          echo "✓ Mapbox token is being used from environment"
-        else
-          echo "Warning: Mapbox token usage not found in app files"
-        fi
-    
-    - name: Check for Supabase integration
-      run: |
-        # Ensure Supabase is properly integrated
-        if grep -r "@supabase/supabase-js" app/; then
-          echo "✓ Supabase integration found"
-        else
-          echo "Warning: Supabase integration not found"
-        fi
-    
-    - name: Build test
-      run: npm run build 
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type checking
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Check for console.* in non-test code
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          # Fail on console.log/info/debug/warn/error in app/** excluding tests, stories, and config files
+          if grep -R --line-number --exclude-dir=node_modules --exclude-dir=.next \
+               --exclude-dir=out --exclude-dir=dist \
+               --exclude='*.test.*' --exclude='*.spec.*' --exclude='*.stories.*' \
+               -E 'console\.(log|info|debug|warn|error)\(' app/ ; then
+            echo "✗ console statements found (remove or gate behind NODE_ENV checks)"
+            exit 1
+          else
+            echo "✓ No console statements found in app/"
+          fi
+
+      - name: Validate Next.js configuration loads
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONFIG=""
+          for c in next.config.ts next.config.mjs next.config.cjs next.config.js; do
+            if [[ -f "$c" ]]; then CONFIG="$c"; break; fi
+          done
+          if [[ -z "$CONFIG" ]]; then
+            echo "✗ next.config.(ts|mjs|cjs|js) not found"; exit 1
+          fi
+          echo "Found $CONFIG"
+
+          # Try loading the config in Node to catch syntax/exports errors.
+          # Supports ESM/CJS. TypeScript config relies on Next to compile at build time,
+          # so here we only sanity-check presence; the build step will surface TS errors.
+          node --eval "
+            (async () => {
+              const path = './$CONFIG';
+              try {
+                // dynamic import handles ESM; require handles CJS
+                let cfg;
+                try { cfg = (await import(path)).default ?? (await import(path)); }
+                catch { cfg = require(path); }
+                if (!cfg) console.log('Config loaded (no default export is fine).');
+                console.log('✓ Next config loaded successfully');
+              } catch (e) {
+                console.error('✗ Failed to load Next config:', e?.message || e);
+                process.exit(1);
+              }
+            })();
+          "
+
+      - name: Verify Mapbox token usage reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R --exclude-dir=node_modules --exclude-dir=.next --exclude='*.test.*' \
+               -F "process.env.NEXT_PUBLIC_MAPBOX_TOKEN" app/ ; then
+            echo "✓ Mapbox token referenced via env"
+          else
+            echo "⚠ Mapbox token reference not found in app/ (ensure it's read from env)"
+          fi
+
+      - name: Verify Supabase integration reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R --exclude-dir=node_modules --exclude-dir=.next \
+               -F "@supabase/supabase-js" app/ ; then
+            echo "✓ Supabase integration referenced"
+          else
+            echo "⚠ Supabase integration reference not found in app/"
+          fi
+
+      - name: Build (ensures config + envs are valid)
+        env:
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npm run build
