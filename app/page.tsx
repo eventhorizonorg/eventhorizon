@@ -10,13 +10,19 @@ import { createClient } from '@supabase/supabase-js'
 // Types for real-time notifications
 interface NewMessage {
   id: number
+  post_id: number
   text: string
   date: string
   channel: string
+  channel_username: string
   latitude: number
   longitude: number
+  location_name?: string
   country_code?: string
-  telegram_id?: string
+  has_photo?: boolean
+  has_video?: boolean
+  views?: number
+  forwards?: number
 }
 
 interface Notification {
@@ -93,13 +99,19 @@ export default function Home() {
       },
       properties: {
         id: newMessage.id,
+        post_id: newMessage.post_id,
         text: newMessage.text,
         date: newMessage.date,
         channel: newMessage.channel,
+        channel_username: newMessage.channel_username,
         latitude: newMessage.latitude,
         longitude: newMessage.longitude,
+        location_name: newMessage.location_name,
         country_code: newMessage.country_code,
-        telegram_id: newMessage.telegram_id,
+        has_photo: newMessage.has_photo,
+        has_video: newMessage.has_video,
+        views: newMessage.views,
+        forwards: newMessage.forwards,
         pulse: 0.5,
         phase: Math.random() * Math.PI * 2
       }
@@ -232,21 +244,21 @@ export default function Home() {
     initMap()
   }, [])
 
-  // Load and plot messages
+  // Load and plot posts
   const loadAndPlotMessages = async () => {
     try {
-      const response = await fetch('/api/messages')
+      const response = await fetch('/api/posts')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
       const responseData = await response.json()
       
-      if (!responseData.messages || !Array.isArray(responseData.messages)) {
-        throw new Error('Invalid response format: messages array not found')
+      if (!responseData.posts || !Array.isArray(responseData.posts)) {
+        throw new Error('Invalid response format: posts array not found')
       }
       
-      const messages = responseData.messages
+      const messages = responseData.posts
       
       const geojson: FeatureCollection<Point> = {
         type: 'FeatureCollection',
@@ -258,13 +270,19 @@ export default function Home() {
           },
           properties: {
             id: msg.id,
+            post_id: msg.post_id,
             text: msg.text,
             date: msg.date,
             channel: msg.channel,
+            channel_username: msg.channel_username,
             latitude: msg.latitude,
             longitude: msg.longitude,
+            location_name: msg.location_name,
             country_code: msg.country_code,
-            telegram_id: msg.telegram_id,
+            has_photo: msg.has_photo,
+            has_video: msg.has_video,
+            views: msg.views,
+            forwards: msg.forwards,
             pulse: 0.5,
             phase: Math.random() * Math.PI * 2
           }
@@ -392,9 +410,7 @@ export default function Home() {
             locationString = `${coordinates[1].toFixed(4)}, ${coordinates[0].toFixed(4)}`;
           }
           
-          // Check if we have telegram_id for widget embedding
-          const hasTelegramId = props.telegram_id && props.telegram_id !== 'null'
-          const cleanChannel = String(props.channel).replace('@', '')
+          const cleanChannel = String(props.channel_username || props.channel).replace('@', '')
           
           // Truncate text for popup preview
           const truncatedText = String(props.text).length > 150 
@@ -405,8 +421,10 @@ export default function Home() {
             <div class="message-popup fade-in" id="telegram-hover-popup">
               <h4>📢 ${String(props.channel)}</h4>
               <p><strong>Date:</strong> ${new Date(String(props.date)).toLocaleString()}</p>
-              <p><strong>Location:</strong> ${locationString}</p>
+              ${props.location_name ? `<p><strong>Location:</strong> ${String(props.location_name)} (${locationString})</p>` : `<p><strong>Coordinates:</strong> ${locationString}</p>`}
               ${props.country_code ? `<p><strong>Country:</strong> ${String(props.country_code)}</p>` : ''}
+              ${props.views ? `<p><strong>Views:</strong> ${props.views.toLocaleString()}</p>` : ''}
+              ${props.forwards ? `<p><strong>Forwards:</strong> ${props.forwards.toLocaleString()}</p>` : ''}
               <div class="message-text">
                 <strong>Message:</strong><br>
                 ${truncatedText}
@@ -414,26 +432,32 @@ export default function Home() {
                   <br><br>
                   <button class="read-more-btn" onclick="window.openExpandedPopup(${JSON.stringify({
                     id: props.id,
+                    post_id: props.post_id,
                     text: props.text,
                     date: props.date,
                     channel: props.channel,
+                    channel_username: props.channel_username,
                     latitude: props.latitude,
                     longitude: props.longitude,
+                    location_name: props.location_name,
                     country_code: props.country_code,
-                    telegram_id: props.telegram_id
+                    has_photo: props.has_photo,
+                    has_video: props.has_video,
+                    views: props.views,
+                    forwards: props.forwards
                   }).replace(/"/g, '&quot;')})">
                     📖 Read Full Message
                   </button>
                 ` : ''}
               </div>
-              ${hasTelegramId ? `
-                <div class="telegram-widget-container">
-                  <div class="widget-loading">Loading Telegram post...</div>
-                  <script async src="https://telegram.org/js/telegram-widget.js?1" 
-                          data-telegram-post="${cleanChannel}/${props.telegram_id}" 
-                          data-width="100%" 
-                          data-author-photo="true"
-                          data-dark="1"></script>
+              ${props.post_id && cleanChannel ? `
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+                  <a href="https://t.me/${cleanChannel}/${props.post_id}" 
+                     target="_blank" 
+                     rel="noopener noreferrer"
+                     style="color: #0088cc; text-decoration: none; font-size: 14px;">
+                    🔗 View on Telegram →
+                  </a>
                 </div>
               ` : ''}
             </div>
@@ -447,13 +471,19 @@ export default function Home() {
           ;(window as any).openExpandedPopup = (messageData: any) => {
             const message: NewMessage = {
               id: messageData.id,
+              post_id: messageData.post_id,
               text: messageData.text,
               date: messageData.date,
               channel: messageData.channel,
+              channel_username: messageData.channel_username,
               latitude: messageData.latitude,
               longitude: messageData.longitude,
+              location_name: messageData.location_name,
               country_code: messageData.country_code,
-              telegram_id: messageData.telegram_id
+              has_photo: messageData.has_photo,
+              has_video: messageData.has_video,
+              views: messageData.views,
+              forwards: messageData.forwards
             }
             setExpandedPopup({
               isOpen: true,
@@ -474,40 +504,6 @@ export default function Home() {
                   if (popupShouldClose) closePopupWithFade()
                 }, 10)
               })
-              
-              // Handle widget loading and errors
-              if (hasTelegramId) {
-                const widgetContainer = popupDiv.querySelector('.telegram-widget-container')
-                if (widgetContainer) {
-                  const script = widgetContainer.querySelector('script')
-                  if (script) {
-                    script.onerror = () => {
-                      const loadingDiv = widgetContainer.querySelector('.widget-loading')
-                      if (loadingDiv) {
-                        loadingDiv.innerHTML = `
-                          <div style="text-align: center; color: #dc3545; padding: 20px;">
-                            <p>Failed to load Telegram post</p>
-                            <a href="https://t.me/${cleanChannel}/${props.telegram_id}" 
-                               target="_blank" 
-                               rel="noopener noreferrer"
-                               style="color: #0088cc; text-decoration: none;">
-                              View on Telegram
-                            </a>
-                          </div>
-                        `
-                      }
-                    }
-                    
-                    // Remove loading text when widget loads
-                    setTimeout(() => {
-                      const loadingDiv = widgetContainer.querySelector('.widget-loading') as HTMLElement
-                      if (loadingDiv) {
-                        loadingDiv.style.display = 'none'
-                      }
-                    }, 3000)
-                  }
-                }
-              }
             }
           }, 10)
         })
@@ -531,7 +527,7 @@ export default function Home() {
         })
       }
     } catch (error) {
-      console.error('❌ Error loading messages:', error)
+      console.error('❌ Error loading posts:', error)
       console.error('🔍 Error details:', {
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
@@ -684,7 +680,7 @@ export default function Home() {
                   <div>
                     <span className="font-medium">Location:</span>
                     <br />
-                    {expandedPopup.message.latitude.toFixed(4)}, {expandedPopup.message.longitude.toFixed(4)}
+                    {expandedPopup.message.location_name || `${expandedPopup.message.latitude.toFixed(4)}, ${expandedPopup.message.longitude.toFixed(4)}`}
                   </div>
                   {expandedPopup.message.country_code && (
                     <div>
@@ -693,7 +689,37 @@ export default function Home() {
                       {expandedPopup.message.country_code}
                     </div>
                   )}
+                  {expandedPopup.message.views && (
+                    <div>
+                      <span className="font-medium">Views:</span>
+                      <br />
+                      {expandedPopup.message.views.toLocaleString()}
+                    </div>
+                  )}
+                  {expandedPopup.message.forwards && (
+                    <div>
+                      <span className="font-medium">Forwards:</span>
+                      <br />
+                      {expandedPopup.message.forwards.toLocaleString()}
+                    </div>
+                  )}
                 </div>
+                
+                {/* Media indicators */}
+                {(expandedPopup.message.has_photo || expandedPopup.message.has_video) && (
+                  <div className="mb-4 flex gap-2">
+                    {expandedPopup.message.has_photo && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        📷 Photo
+                      </span>
+                    )}
+                    {expandedPopup.message.has_video && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        🎥 Video
+                      </span>
+                    )}
+                  </div>
+                )}
                 
                 {/* Full Message Text */}
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -703,26 +729,6 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              
-              {/* Telegram Widget */}
-              {expandedPopup.message.telegram_id && expandedPopup.message.telegram_id !== 'null' && (
-                <div className="border-t border-gray-200 pt-6">
-                  <h4 className="font-medium text-gray-900 mb-4">Telegram Post:</h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="telegram-widget-container">
-                      <div className="widget-loading">Loading Telegram post...</div>
-                      <script 
-                        async 
-                        src="https://telegram.org/js/telegram-widget.js?1" 
-                        data-telegram-post={`${String(expandedPopup.message.channel).replace('@', '')}/${expandedPopup.message.telegram_id}`}
-                        data-width="100%" 
-                        data-author-photo="true"
-                        data-dark="0"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
             
             {/* Footer */}
@@ -730,9 +736,9 @@ export default function Home() {
               <div className="text-sm text-gray-500">
                 Click outside to close
               </div>
-              {expandedPopup.message.telegram_id && expandedPopup.message.telegram_id !== 'null' && (
+              {expandedPopup.message.post_id && expandedPopup.message.channel_username && (
                 <a
-                  href={`https://t.me/${String(expandedPopup.message.channel).replace('@', '')}/${expandedPopup.message.telegram_id}`}
+                  href={`https://t.me/${String(expandedPopup.message.channel_username).replace('@', '')}/${expandedPopup.message.post_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
