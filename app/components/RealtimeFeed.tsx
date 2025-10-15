@@ -76,7 +76,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           
           // Sort by date and take latest 5
           const latestPosts = uniquePosts
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .sort((a: FeedPost, b: FeedPost) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 5)
           
           console.log(`📍 Feed loaded ${latestPosts.length} posts`)
@@ -261,14 +261,22 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
               {/* Post Header */}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
-                  <span className="text-white text-xs font-medium truncate flex items-center space-x-1">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="white"/>
+                  <span className="text-white text-xs font-medium truncate flex items-center">
+                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                     </svg>
-                    <span>{post.channel_name}</span>
+                    {post.channel_name}
                   </span>
-                  {post.has_photo && <span className="text-blue-400 text-xs">📷</span>}
-                  {post.has_video && <span className="text-purple-400 text-xs">🎥</span>}
+                  {post.has_photo && (
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H20V6H4M6,8A1,1 0 0,1 7,9A1,1 0 0,1 6,10A1,1 0 0,1 5,9A1,1 0 0,1 6,8M12,19L18,13L16.59,11.59L12,16.17L9.41,13.59L8,15L12,19Z"/>
+                    </svg>
+                  )}
+                  {post.has_video && (
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17,10.5V7A1,1 0 0,0 16,6H4A1,1 0 0,0 3,7V17A1,1 0 0,0 4,18H16A1,1 0 0,0 17,17V13.5L21,17.5V6.5L17,10.5Z"/>
+                    </svg>
+                  )}
                 </div>
                 <span className="text-white/60 text-xs">
                   {formatTime(post.date)}
@@ -276,35 +284,40 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
               </div>
 
               {/* Post Content */}
-              <p className="text-white/90 text-xs leading-relaxed mb-2">
+              <p className="text-white/90 text-sm leading-relaxed mb-2">
                 {truncateText(post.text)}
               </p>
 
               {/* Post Footer */}
-              <div className="flex items-center justify-between text-xs text-white/60 min-h-[20px]">
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
+              <div className="flex items-center justify-between text-xs text-white/60">
+                <div className="flex items-center space-x-2">
                   {post.location_name && (
-                    <span className="flex items-center space-x-1 flex-shrink-0">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22S19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9S10.62 6.5 12 6.5S14.5 7.62 14.5 9S13.38 11.5 12 11.5Z" fill="white"/>
+                    <span className="flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12,2C8.13,2 5,5.13 5,9C5,14.25 12,22 12,22S19,14.25 19,9C19,5.13 15.87,2 12,2M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5Z"/>
                       </svg>
-                      <span className="truncate">{post.location_name}</span>
+                      {post.location_name}
                     </span>
                   )}
                   {post.country_code && (
-                    <span className="flex-shrink-0">🌍 {post.country_code}</span>
+                    <span className="flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
+                      </svg>
+                      {post.country_code}
+                    </span>
                   )}
                 </div>
-                <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                <div className="flex items-center space-x-2">
                   {post.channel_username && (
                     <a
                       href={`https://t.me/${post.channel_username.replace('@', '')}/${post.post_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 transition-colors text-[10px] whitespace-nowrap"
+                      className="text-blue-400 hover:text-blue-300 transition-colors"
                       onClick={(e) => e.stopPropagation()} // Prevent parent click
                     >
-                      View on Telegram
+                      View →
                     </a>
                   )}
                 </div>

@@ -32,12 +32,6 @@ interface Notification {
   isVisible: boolean
 }
 
-// Type for expanded popup state
-interface ExpandedPopup {
-  isOpen: boolean
-  message: NewMessage | null
-  position: { x: number; y: number } | null
-}
 
 export default function Home() {
   const mapContainer = useRef<HTMLDivElement>(null)
@@ -61,12 +55,6 @@ export default function Home() {
   const supabaseRef = useRef<any>(null)
   const subscriptionRef = useRef<any>(null)
 
-  // Expanded popup state
-  const [expandedPopup, setExpandedPopup] = useState<ExpandedPopup>({
-    isOpen: false,
-    message: null,
-    position: null
-  })
 
   // Function to zoom to coordinates and highlight the marker
   const zoomToCoordinates = (latitude: number, longitude: number, locationName?: string, postId?: number) => {
@@ -74,78 +62,91 @@ export default function Home() {
     
     console.log(`🗺️ Zooming to: ${locationName || 'Unknown'} (${latitude}, ${longitude})`)
     
+    // Check if this is a country-level location
+    if (locationName && isCountryOnlyLocation(locationName)) {
+      console.log(`🌍 Country-level location detected: ${locationName} - showing country borders`)
+      
+      // Add country border visualization
+      addCountryBorders(locationName)
+    } else {
+      // Remove any existing country borders for city-level locations
+      removeCountryBorders()
+    }
+    
     map.current.flyTo({
       center: [longitude, latitude],
-      zoom: 8,
+      zoom: 6,
       duration: 2000,
       essential: true
     })
-    
-    // Highlight the specific marker after zoom completes
-    setTimeout(() => {
-      if (!map.current || !map.current.getSource('telegram-points')) return
-      
-      const geojson = geojsonRef.current
-      if (!geojson.features || geojson.features.length === 0) return
-      
-      // Find and highlight the specific marker
-      let foundMarker = false
-      geojson.features.forEach((feature: any) => {
-        if (feature.properties.id === postId || 
-            (Math.abs(feature.geometry.coordinates[0] - longitude) < 0.001 && 
-             Math.abs(feature.geometry.coordinates[1] - latitude) < 0.001)) {
-          // Highlight this marker by making it larger and brighter
-          feature.properties.highlighted = true
-          feature.properties.pulse = 1.5 // Make it larger
-          foundMarker = true
-          console.log(`🎯 Highlighted marker for post ${postId || 'unknown'}`)
-        } else {
-          // Reset other markers
-          feature.properties.highlighted = false
+  }
+
+  // Function to add country border visualization
+  const addCountryBorders = (countryName: string) => {
+    if (!map.current) return
+
+    // Remove existing country borders first
+    removeCountryBorders()
+
+    try {
+      // Add country border source and layer
+      map.current.addSource('country-borders', {
+        type: 'vector',
+        url: 'mapbox://mapbox.country-boundaries-v1'
+      })
+
+      map.current.addLayer({
+        id: 'country-borders-fill',
+        type: 'fill',
+        source: 'country-borders',
+        'source-layer': 'country_boundaries',
+        filter: ['==', 'name_en', countryName],
+        paint: {
+          'fill-color': '#ffffff',
+          'fill-opacity': 0.1
         }
       })
-      
-      if (foundMarker) {
-        // Update the map data
-        try {
-          ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(geojson)
-          
-          // Remove highlight after 5 seconds
-          setTimeout(() => {
-            geojson.features.forEach((feature: any) => {
-              feature.properties.highlighted = false
-            })
-            if (map.current && map.current.getSource('telegram-points')) {
-              ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(geojson)
-            }
-          }, 5000)
-        } catch (error) {
-          console.error('❌ Error highlighting marker:', error)
+
+      map.current.addLayer({
+        id: 'country-borders-stroke',
+        type: 'line',
+        source: 'country-borders',
+        'source-layer': 'country_boundaries',
+        filter: ['==', 'name_en', countryName],
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 2,
+          'line-opacity': 0.8
         }
+      })
+
+      console.log(`🗺️ Added country borders for: ${countryName}`)
+    } catch (error) {
+      console.error('❌ Error adding country borders:', error)
+    }
+  }
+
+  // Function to remove country border visualization
+  const removeCountryBorders = () => {
+    if (!map.current) return
+
+    try {
+      // Remove layers
+      if (map.current.getLayer('country-borders-fill')) {
+        map.current.removeLayer('country-borders-fill')
       }
-    }, 2100) // Wait for flyTo to complete
-    
-    // Show a temporary popup
-    if (locationName) {
-      new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        className: 'custom-popup'
-      })
-        .setLngLat([longitude, latitude])
-        .setHTML(`
-          <div class="text-center">
-            <div class="font-semibold text-blue-600">📍 ${locationName}</div>
-            <div class="text-sm text-gray-600">Zoomed from feed</div>
-          </div>
-        `)
-        .addTo(map.current)
-      
-      // Remove popup after 3 seconds
-      setTimeout(() => {
-        const popups = document.querySelectorAll('.custom-popup')
-        popups.forEach(popup => popup.remove())
-      }, 3000)
+      if (map.current.getLayer('country-borders-stroke')) {
+        map.current.removeLayer('country-borders-stroke')
+      }
+
+      // Remove source
+      if (map.current.getSource('country-borders')) {
+        map.current.removeSource('country-borders')
+      }
+
+      console.log('🗺️ Removed country borders')
+    } catch (error) {
+      console.error('❌ Error removing country borders:', error)
     }
   }
 
@@ -207,25 +208,14 @@ export default function Home() {
     ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(currentGeojson)
   }
 
-  // Handle expanded popup open
-  const openExpandedPopup = (message: NewMessage, event: React.MouseEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    
-    setExpandedPopup({
-      isOpen: true,
-      message,
-      position: { x: event.clientX, y: event.clientY }
-    })
-  }
 
-  // Handle expanded popup close
-  const closeExpandedPopup = () => {
-    setExpandedPopup({
-      isOpen: false,
-      message: null,
-      position: null
-    })
+  // Stop idle rotation
+  const stopIdleRotation = () => {
+    if (rotationAnimationRef.current) {
+      cancelAnimationFrame(rotationAnimationRef.current)
+      rotationAnimationRef.current = null
+    }
+    setIsIdle(false)
   }
 
   // Reset idle timer
@@ -233,24 +223,43 @@ export default function Home() {
     if (idleTimerRef.current) {
       clearTimeout(idleTimerRef.current)
     }
-    setIsIdle(false)
+    stopIdleRotation()
     idleTimerRef.current = setTimeout(() => {
       setIsIdle(true)
       startIdleRotation()
-    }, 30000) // 30 seconds
+    }, 5000) // 5 seconds of inactivity
   }
+
+  // Rotation configuration (following Mapbox example)
+  const maxSpinZoom = 5 // Above zoom level 5, do not rotate
+  const slowSpinZoom = 3 // Rotate at intermediate speeds between zoom levels 3 and 5
+  const baseRotationSpeed = 0.05 // Base rotation speed in degrees per second
 
   // Start idle rotation
   const startIdleRotation = () => {
-    if (!map.current) return
+    if (!map.current || !isIdle) return
     
     rotationStartTime.current = Date.now()
     
     const animateRotation = () => {
       if (!map.current || !isIdle) return
       
-      const elapsed = Date.now() - rotationStartTime.current
-      const rotationSpeed = 0.1 // degrees per second
+      const zoom = map.current.getZoom()
+      
+      // Stop rotation at high zoom levels (following Mapbox example)
+      if (zoom >= maxSpinZoom) {
+        rotationAnimationRef.current = requestAnimationFrame(animateRotation)
+        return
+      }
+      
+      let rotationSpeed = baseRotationSpeed
+      
+      // Slow down rotation at higher zoom levels (following Mapbox example)
+      if (zoom > slowSpinZoom) {
+        const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom)
+        rotationSpeed *= zoomDif
+      }
+      
       const currentBearing = map.current.getBearing()
       const newBearing = currentBearing + rotationSpeed
       
@@ -270,15 +279,21 @@ export default function Home() {
     const handleActivity = () => resetIdleTimer()
     
     // Add event listeners for user activity
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'wheel']
     events.forEach(event => {
-      document.addEventListener(event, handleActivity)
+      document.addEventListener(event, handleActivity, { passive: true })
     })
     
     return () => {
       events.forEach(event => {
         document.removeEventListener(event, handleActivity)
       })
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current)
+      }
+      if (rotationAnimationRef.current) {
+        cancelAnimationFrame(rotationAnimationRef.current)
+      }
     }
   }, [])
 
@@ -307,8 +322,9 @@ export default function Home() {
           attributionControl: false
         })
 
-        map.current.on('load', () => {
-          loadAndPlotMessages()
+        map.current.on('load', async () => {
+          await loadAndPlotMessages()
+          console.log('🎬 Starting pulse animation...')
           animatePulse()
           
           // Remove any remaining Mapbox logos
@@ -319,6 +335,30 @@ export default function Home() {
           
           // Initialize globe rotation
           initGlobeRotation()
+          
+          // Start idle timer
+          resetIdleTimer()
+          
+          // Add idle rotation handlers
+          map.current.on('mousedown', () => {
+            stopIdleRotation()
+          })
+          
+          map.current.on('dragstart', () => {
+            stopIdleRotation()
+          })
+          
+          map.current.on('rotatestart', () => {
+            stopIdleRotation()
+          })
+          
+          map.current.on('pitchstart', () => {
+            stopIdleRotation()
+          })
+          
+          map.current.on('zoomstart', () => {
+            stopIdleRotation()
+          })
         })
 
         map.current.on('error', (e) => {
@@ -398,11 +438,55 @@ export default function Home() {
       return () => {
         console.log('🔌 Cleaning up real-time subscription')
         subscription.unsubscribe()
+      // Clean up country borders
+      removeCountryBorders()
       }
     } catch (error) {
       console.error('❌ Error setting up real-time subscription:', error)
     }
   }, [])
+
+  // Helper function to check if location is country-level only
+  const isCountryOnlyLocation = (locationName: string) => {
+    if (!locationName) return false
+    
+    // List of common country names that should not show dots
+    const countryOnlyNames = [
+      'United States', 'China', 'India', 'Russia', 'Brazil', 'Canada', 'Australia',
+      'Germany', 'France', 'United Kingdom', 'Italy', 'Spain', 'Japan', 'South Korea',
+      'Mexico', 'Indonesia', 'Netherlands', 'Saudi Arabia', 'Turkey', 'Switzerland',
+      'Iran',
+      'Belgium', 'Israel', 'Austria', 'Sweden', 'Poland', 'Norway', 'Denmark',
+      'Finland', 'Chile', 'New Zealand', 'Ireland', 'Portugal', 'Greece', 'Czech Republic',
+      'Romania', 'Hungary', 'Bulgaria', 'Croatia', 'Slovakia', 'Slovenia', 'Estonia',
+      'Latvia', 'Lithuania', 'Malta', 'Cyprus', 'Luxembourg', 'Iceland', 'Liechtenstein',
+      'Monaco', 'San Marino', 'Vatican City', 'Andorra', 'Ukraine', 'Belarus', 'Moldova',
+      'Georgia', 'Armenia', 'Azerbaijan', 'Kazakhstan', 'Uzbekistan', 'Kyrgyzstan',
+      'Tajikistan', 'Turkmenistan', 'Afghanistan', 'Pakistan', 'Bangladesh', 'Sri Lanka',
+      'Nepal', 'Bhutan', 'Maldives', 'Mongolia', 'North Korea', 'Taiwan', 'Hong Kong',
+      'Macau', 'Singapore', 'Malaysia', 'Thailand', 'Vietnam', 'Cambodia', 'Laos',
+      'Myanmar', 'Philippines', 'Indonesia', 'Brunei', 'East Timor', 'Papua New Guinea',
+      'Fiji', 'Samoa', 'Tonga', 'Vanuatu', 'Solomon Islands', 'Palau', 'Micronesia',
+      'Marshall Islands', 'Kiribati', 'Tuvalu', 'Nauru', 'South Africa', 'Egypt',
+      'Nigeria', 'Ethiopia', 'Kenya', 'Tanzania', 'Uganda', 'Ghana', 'Morocco',
+      'Algeria', 'Tunisia', 'Libya', 'Sudan', 'Chad', 'Niger', 'Mali', 'Burkina Faso',
+      'Senegal', 'Guinea', 'Sierra Leone', 'Liberia', 'Ivory Coast', 'Ghana', 'Togo',
+      'Benin', 'Cameroon', 'Central African Republic', 'Democratic Republic of the Congo',
+      'Republic of the Congo', 'Gabon', 'Equatorial Guinea', 'Sao Tome and Principe',
+      'Angola', 'Zambia', 'Zimbabwe', 'Botswana', 'Namibia', 'Lesotho', 'Swaziland',
+      'Madagascar', 'Mauritius', 'Seychelles', 'Comoros', 'Cape Verde', 'Guinea-Bissau',
+      'Gambia', 'Mauritania', 'Djibouti', 'Eritrea', 'Somalia', 'Rwanda', 'Burundi',
+      'Malawi', 'Mozambique', 'Zambia', 'Zimbabwe', 'Botswana', 'Namibia', 'Lesotho',
+      'Swaziland', 'South Africa', 'Argentina', 'Brazil', 'Chile', 'Uruguay', 'Paraguay',
+      'Bolivia', 'Peru', 'Ecuador', 'Colombia', 'Venezuela', 'Guyana', 'Suriname',
+      'French Guiana', 'Panama', 'Costa Rica', 'Nicaragua', 'Honduras', 'El Salvador',
+      'Guatemala', 'Belize', 'Jamaica', 'Cuba', 'Haiti', 'Dominican Republic',
+      'Puerto Rico', 'Trinidad and Tobago', 'Barbados', 'Saint Lucia', 'Saint Vincent',
+      'Grenada', 'Antigua and Barbuda', 'Saint Kitts and Nevis', 'Dominica'
+    ]
+    
+    return countryOnlyNames.includes(locationName)
+  }
 
   // Load and plot posts
   const loadAndPlotMessages = async () => {
@@ -422,11 +506,12 @@ export default function Home() {
       
       const messages = responseData.posts
       console.log(`📍 Processing ${messages.length} posts`)
-      
-      // Filter posts that have location data (latitude and longitude)
+
+      // Filter posts that have location data (latitude and longitude) but exclude country-only locations
       const postsWithLocations = messages.filter((msg: any) => 
         msg.latitude !== null && msg.longitude !== null && 
-        msg.latitude !== undefined && msg.longitude !== undefined
+        msg.latitude !== undefined && msg.longitude !== undefined &&
+        !isCountryOnlyLocation(msg.location_name)
       )
       
       console.log(`📍 Found ${postsWithLocations.length} posts with location data`)
@@ -452,9 +537,8 @@ export default function Home() {
             country_code: msg.country_code,
             has_photo: msg.has_photo,
             has_video: msg.has_video,
-            pulse: 0.5,
-            phase: Math.random() * Math.PI * 2,
-            highlighted: false // Initialize as not highlighted
+            pulse: 1.0, // Start at full brightness for new posts
+            phase: Math.random() * Math.PI * 2
           }
         }))
       }
@@ -479,36 +563,6 @@ export default function Home() {
           data: geojson
         })
 
-        // Add glow layer first (behind the main points) - dramatic pulsing white glow
-        map.current.addLayer({
-          id: 'telegram-points-glow',
-          type: 'circle',
-          source: 'telegram-points',
-          paint: {
-            'circle-radius': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              0, 6,
-              8, 12
-            ],
-            'circle-color': [
-              'case',
-              ['get', 'highlighted'],
-              '#00ff00', // Green glow for highlighted markers
-              '#ffffff'  // White glow for normal markers
-            ],
-            'circle-opacity': [
-              'interpolate',
-              ['linear'],
-              ['get', 'pulse'],
-              0, 0.05,
-              1, 0.4
-            ],
-            'circle-stroke-width': 0
-          }
-        })
-
         // Add main points layer - dramatic pulsing white dots
         map.current.addLayer({
           id: 'telegram-points-layer',
@@ -522,12 +576,7 @@ export default function Home() {
               0, 2,
               8, 4
             ],
-            'circle-color': [
-              'case',
-              ['get', 'highlighted'],
-              '#00ff00', // Green for highlighted markers
-              '#ffffff'  // White for normal markers
-            ],
+            'circle-color': '#ffffff',
             'circle-opacity': [
               'interpolate',
               ['linear'],
@@ -536,12 +585,7 @@ export default function Home() {
               1, 1.0
             ],
             'circle-stroke-width': 1,
-            'circle-stroke-color': [
-              'case',
-              ['get', 'highlighted'],
-              '#00ff00', // Green stroke for highlighted markers
-              '#ffffff'  // White stroke for normal markers
-            ],
+            'circle-stroke-color': '#ffffff',
             'circle-stroke-opacity': [
               'interpolate',
               ['linear'],
@@ -554,171 +598,15 @@ export default function Home() {
         
         console.log('✅ Map layers added successfully')
         
-        // Create popup
-        const hoverPopup = new mapboxgl.Popup({
-          closeButton: true,
-          closeOnClick: false,
-          maxWidth: '400px'
-        })
-
-        let popupOpen = false
-        let popupShouldClose = true
-
-        const closePopupWithFade = () => {
-          if (hoverPopup.isOpen()) {
-            const popupElement = hoverPopup.getElement()
-            if (popupElement) {
-              popupElement.classList.add('fade-out')
-              setTimeout(() => {
-                hoverPopup.remove()
-                popupOpen = false
-              }, 200)
-            }
-          }
-        }
-
-        map.current.on('mouseenter', 'telegram-points-layer', (e) => {
-          if (!e.features || e.features.length === 0) return
-          
+        // Simple hover effect - just change cursor
+        map.current.on('mouseenter', 'telegram-points-layer', () => {
           map.current!.getCanvas().style.cursor = 'pointer'
-          popupShouldClose = false
-          
-          const feature = e.features[0]
-          const props = feature.properties
-          if (!props) return
-          
-          let coordinates: [number, number] = [0, 0]
-          if (feature.geometry.type === 'Point') {
-            const coords = feature.geometry.coordinates
-            if (Array.isArray(coords) && coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
-              coordinates = [coords[0], coords[1]]
-            }
-          }
-          
-          let locationString = 'Unknown';
-          if (
-            Array.isArray(coordinates) &&
-            coordinates.length === 2 &&
-            typeof coordinates[0] === 'number' &&
-            typeof coordinates[1] === 'number' &&
-            !isNaN(coordinates[0]) &&
-            !isNaN(coordinates[1])
-          ) {
-            locationString = `${coordinates[1].toFixed(4)}, ${coordinates[0].toFixed(4)}`;
-          }
-          
-          const cleanChannel = String(props.channel_username || props.channel).replace('@', '')
-          
-          // Truncate text for popup preview
-          const truncatedText = String(props.text).length > 150 
-            ? String(props.text).substring(0, 150) + '...'
-            : String(props.text)
-          
-          const popupContent = `
-            <div class="message-popup fade-in" id="telegram-hover-popup">
-              <h4 style="color: #333; font-weight: bold; margin: 0 0 8px 0;">📢 ${String(props.channel_name || props.channel || 'Unknown Channel')}</h4>
-              <p><strong>Date:</strong> ${new Date(String(props.date)).toLocaleString()}</p>
-              ${props.location_name ? `<p><strong>Location:</strong> ${String(props.location_name)} (${locationString})</p>` : `<p><strong>Coordinates:</strong> ${locationString}</p>`}
-              ${props.country_code ? `<p><strong>Country:</strong> ${String(props.country_code)}</p>` : ''}
-              <div class="message-text">
-                <strong>Message:</strong><br>
-                ${truncatedText}
-                ${String(props.text).length > 150 ? `
-                  <br><br>
-                  <button class="read-more-btn" onclick="window.openExpandedPopup(${JSON.stringify({
-                    id: props.id,
-                    post_id: props.post_id,
-                    text: props.text,
-                    date: props.date,
-                    channel: props.channel_name || props.channel,
-                    channel_name: props.channel_name,
-                    channel_username: props.channel_username,
-                    latitude: props.latitude,
-                    longitude: props.longitude,
-                    location_name: props.location_name,
-                    country_code: props.country_code,
-                    has_photo: props.has_photo,
-                    has_video: props.has_video
-                  }).replace(/"/g, '&quot;')})">
-                    📖 Read Full Message
-                  </button>
-                ` : ''}
-              </div>
-              ${props.post_id && cleanChannel ? `
-                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <a href="https://t.me/${cleanChannel}/${props.post_id}" 
-                     target="_blank" 
-                     rel="noopener noreferrer"
-                     style="color: #0088cc; text-decoration: none; font-size: 14px;">
-                    🔗 View on Telegram →
-                  </a>
-                </div>
-              ` : ''}
-            </div>
-          `
-          
-          hoverPopup.setLngLat(coordinates as [number, number]).setHTML(popupContent).addTo(map.current!)
-          popupOpen = true
-          popupShouldClose = false
-          
-          // Make the openExpandedPopup function available globally
-          ;(window as any).openExpandedPopup = (messageData: any) => {
-            const message: NewMessage = {
-              id: messageData.id,
-              post_id: messageData.post_id,
-              text: messageData.text,
-              date: messageData.date,
-              channel: messageData.channel,
-              channel_username: messageData.channel_username,
-              latitude: messageData.latitude,
-              longitude: messageData.longitude,
-              location_name: messageData.location_name,
-              country_code: messageData.country_code,
-              has_photo: messageData.has_photo,
-              has_video: messageData.has_video,
-              views: messageData.views,
-              forwards: messageData.forwards
-            }
-            setExpandedPopup({
-              isOpen: true,
-              message,
-              position: null
-            })
-          }
-          
-          setTimeout(() => {
-            const popupDiv = document.getElementById('telegram-hover-popup')
-            if (popupDiv) {
-              popupDiv.addEventListener('mouseenter', () => {
-                popupShouldClose = false
-              })
-              popupDiv.addEventListener('mouseleave', () => {
-                popupShouldClose = true
-                setTimeout(() => {
-                  if (popupShouldClose) closePopupWithFade()
-                }, 10)
-              })
-            }
-          }, 10)
         })
 
         map.current.on('mouseleave', 'telegram-points-layer', () => {
           map.current!.getCanvas().style.cursor = ''
-          popupShouldClose = true
-          setTimeout(() => {
-            if (popupShouldClose && popupOpen) closePopupWithFade()
-          }, 10)
         })
 
-        // Also handle hover for glow layer
-        map.current.on('mouseenter', 'telegram-points-glow', (e) => {
-          if (!e.features || e.features.length === 0) return
-          map.current!.getCanvas().style.cursor = 'pointer'
-        })
-        
-        map.current.on('mouseleave', 'telegram-points-glow', () => {
-          map.current!.getCanvas().style.cursor = ''
-        })
 
         // Add click handler for zooming to location
         map.current.on('click', 'telegram-points-layer', (e) => {
@@ -732,165 +620,24 @@ export default function Home() {
           const locationName = props.location_name || 'Unknown Location'
           
           // Determine zoom level based on location specificity
-          let zoomLevel = 8 // Default zoom for general areas
+          let zoomLevel = 6 // Default zoom for general areas (more zoomed out)
           
           // Check if it's a city-specific location
           if (locationName.toLowerCase().includes('city') || 
               locationName.toLowerCase().includes('town') ||
               locationName.toLowerCase().includes('village') ||
               locationName.includes(',')) {
-            zoomLevel = 12 // City level zoom
+            zoomLevel = 9 // City level zoom (more zoomed out)
           }
           // Check if it's a country-level location
-          else if (locationName === 'United States' || 
-                   locationName === 'China' || 
-                   locationName === 'Russia' ||
-                   locationName === 'Brazil' ||
-                   locationName === 'Canada' ||
-                   locationName === 'Australia' ||
-                   locationName === 'India' ||
-                   locationName === 'France' ||
-                   locationName === 'Germany' ||
-                   locationName === 'United Kingdom' ||
-                   locationName === 'Italy' ||
-                   locationName === 'Spain' ||
-                   locationName === 'Japan' ||
-                   locationName === 'South Korea' ||
-                   locationName === 'Mexico' ||
-                   locationName === 'Argentina' ||
-                   locationName === 'South Africa' ||
-                   locationName === 'Nigeria' ||
-                   locationName === 'Egypt' ||
-                   locationName === 'Turkey' ||
-                   locationName === 'Iran' ||
-                   locationName === 'Saudi Arabia' ||
-                   locationName === 'Indonesia' ||
-                   locationName === 'Thailand' ||
-                   locationName === 'Vietnam' ||
-                   locationName === 'Philippines' ||
-                   locationName === 'Malaysia' ||
-                   locationName === 'Singapore' ||
-                   locationName === 'Israel' ||
-                   locationName === 'Palestine' ||
-                   locationName === 'Syria' ||
-                   locationName === 'Iraq' ||
-                   locationName === 'Afghanistan' ||
-                   locationName === 'Pakistan' ||
-                   locationName === 'Bangladesh' ||
-                   locationName === 'Sri Lanka' ||
-                   locationName === 'Myanmar' ||
-                   locationName === 'Cambodia' ||
-                   locationName === 'Laos' ||
-                   locationName === 'Mongolia' ||
-                   locationName === 'Kazakhstan' ||
-                   locationName === 'Uzbekistan' ||
-                   locationName === 'Ukraine' ||
-                   locationName === 'Poland' ||
-                   locationName === 'Romania' ||
-                   locationName === 'Bulgaria' ||
-                   locationName === 'Greece' ||
-                   locationName === 'Portugal' ||
-                   locationName === 'Netherlands' ||
-                   locationName === 'Belgium' ||
-                   locationName === 'Switzerland' ||
-                   locationName === 'Austria' ||
-                   locationName === 'Sweden' ||
-                   locationName === 'Norway' ||
-                   locationName === 'Denmark' ||
-                   locationName === 'Finland' ||
-                   locationName === 'Ireland' ||
-                   locationName === 'Iceland' ||
-                   locationName === 'New Zealand' ||
-                   locationName === 'Chile' ||
-                   locationName === 'Peru' ||
-                   locationName === 'Colombia' ||
-                   locationName === 'Venezuela' ||
-                   locationName === 'Ecuador' ||
-                   locationName === 'Bolivia' ||
-                   locationName === 'Paraguay' ||
-                   locationName === 'Uruguay' ||
-                   locationName === 'Guyana' ||
-                   locationName === 'Suriname' ||
-                   locationName === 'French Guiana' ||
-                   locationName === 'Madagascar' ||
-                   locationName === 'Mali' ||
-                   locationName === 'Niger' ||
-                   locationName === 'Chad' ||
-                   locationName === 'Sudan' ||
-                   locationName === 'Ethiopia' ||
-                   locationName === 'Kenya' ||
-                   locationName === 'Tanzania' ||
-                   locationName === 'Uganda' ||
-                   locationName === 'Rwanda' ||
-                   locationName === 'Burundi' ||
-                   locationName === 'Democratic Republic of the Congo' ||
-                   locationName === 'Republic of the Congo' ||
-                   locationName === 'Central African Republic' ||
-                   locationName === 'Cameroon' ||
-                   locationName === 'Gabon' ||
-                   locationName === 'Equatorial Guinea' ||
-                   locationName === 'São Tomé and Príncipe' ||
-                   locationName === 'Angola' ||
-                   locationName === 'Zambia' ||
-                   locationName === 'Zimbabwe' ||
-                   locationName === 'Botswana' ||
-                   locationName === 'Namibia' ||
-                   locationName === 'Lesotho' ||
-                   locationName === 'Swaziland' ||
-                   locationName === 'Mozambique' ||
-                   locationName === 'Malawi' ||
-                   locationName === 'Zambia' ||
-                   locationName === 'Algeria' ||
-                   locationName === 'Tunisia' ||
-                   locationName === 'Libya' ||
-                   locationName === 'Morocco' ||
-                   locationName === 'Western Sahara' ||
-                   locationName === 'Mauritania' ||
-                   locationName === 'Senegal' ||
-                   locationName === 'Gambia' ||
-                   locationName === 'Guinea-Bissau' ||
-                   locationName === 'Guinea' ||
-                   locationName === 'Sierra Leone' ||
-                   locationName === 'Liberia' ||
-                   locationName === 'Ivory Coast' ||
-                   locationName === 'Ghana' ||
-                   locationName === 'Togo' ||
-                   locationName === 'Benin' ||
-                   locationName === 'Burkina Faso' ||
-                   locationName === 'Qatar' ||
-                   locationName === 'United Arab Emirates' ||
-                   locationName === 'Kuwait' ||
-                   locationName === 'Bahrain' ||
-                   locationName === 'Oman' ||
-                   locationName === 'Yemen' ||
-                   locationName === 'Jordan' ||
-                   locationName === 'Lebanon' ||
-                   locationName === 'Cyprus' ||
-                   locationName === 'Georgia' ||
-                   locationName === 'Armenia' ||
-                   locationName === 'Azerbaijan' ||
-                   locationName === 'Belarus' ||
-                   locationName === 'Moldova' ||
-                   locationName === 'Lithuania' ||
-                   locationName === 'Latvia' ||
-                   locationName === 'Estonia' ||
-                   locationName === 'Slovenia' ||
-                   locationName === 'Croatia' ||
-                   locationName === 'Bosnia and Herzegovina' ||
-                   locationName === 'Serbia' ||
-                   locationName === 'Montenegro' ||
-                   locationName === 'North Macedonia' ||
-                   locationName === 'Albania' ||
-                   locationName === 'Kosovo' ||
-                   locationName === 'Malta' ||
-                   locationName === 'Luxembourg' ||
-                   locationName === 'Liechtenstein' ||
-                   locationName === 'Monaco' ||
-                   locationName === 'San Marino' ||
-                   locationName === 'Vatican City' ||
-                   locationName === 'Andorra' ||
-                   locationName === 'Palestinian Authority') {
-            zoomLevel = 6 // Country level zoom
+          else if (isCountryOnlyLocation(locationName)) {
+            zoomLevel = 3 // Country level zoom (more zoomed out)
+            
+            // Add country border visualization for country-level locations
+            addCountryBorders(locationName)
+          } else {
+            // Remove country borders for city-level locations
+            removeCountryBorders()
           }
           
           // Smooth zoom to location
@@ -996,21 +743,23 @@ export default function Home() {
 
   const animatePulse = () => {
     if (!map.current || !map.current.getSource('telegram-points')) {
+      console.log('⚠️ Animation stopped: Map or source not ready')
       return
     }
     
     const geojson = geojsonRef.current
     if (!geojson.features || geojson.features.length === 0) {
+      console.log('⚠️ Animation stopped: No features')
       return
     }
     
     const now = Date.now()
-    const t = ((now - pulseStart.current) / 1000) % 3 // 3s period for slower, more visible pulse
+    const t = ((now - pulseStart.current) / 1000) % 2 // 2s period for faster, more visible pulse
     
     geojson.features.forEach((f: any) => {
       const phase = f.properties.phase || 0
-      // Create a more dramatic pulse effect
-      f.properties.pulse = 0.3 + 0.7 * (1 + Math.sin(2 * Math.PI * t / 3 + phase)) / 2
+      // Create a much more dramatic pulse effect - from 0.1 to 1.5
+      f.properties.pulse = 0.1 + 1.4 * (1 + Math.sin(2 * Math.PI * t / 2 + phase)) / 2
     })
     
     try {
@@ -1025,6 +774,12 @@ export default function Home() {
   const addNewPostToMap = (newPost: any) => {
     if (!map.current || !map.current.getSource('telegram-points')) {
       console.log('⚠️ Map not ready, skipping new post')
+      return
+    }
+
+    // Skip country-only locations (don't show dots for them)
+    if (isCountryOnlyLocation(newPost.location_name)) {
+      console.log('📍 Skipping country-only location:', newPost.location_name)
       return
     }
 
@@ -1052,8 +807,7 @@ export default function Home() {
           has_photo: newPost.has_photo,
           has_video: newPost.has_video,
           pulse: 1.0, // Start at full brightness for new posts
-          phase: Math.random() * Math.PI * 2,
-          highlighted: false // Initialize as not highlighted
+          phase: Math.random() * Math.PI * 2
         }
       }
 
@@ -1201,15 +955,22 @@ export default function Home() {
       {/* Live notification */}
       {liveNotification.show && (
         <div className="absolute top-16 right-4 z-50 max-w-sm">
-          {console.log('🔔 Rendering live notification:', liveNotification)}
           <div 
             className="bg-black/80 backdrop-blur-sm rounded-lg p-4 border border-white/20 cursor-pointer hover:bg-black/90 transition-all duration-300 group"
             onClick={() => {
               if (liveNotification.post && map.current) {
+                // Check if this is a country-level location
+                if (liveNotification.post.location_name && isCountryOnlyLocation(liveNotification.post.location_name)) {
+                  console.log(`🌍 Country-level location detected: ${liveNotification.post.location_name} - showing country borders`)
+                  addCountryBorders(liveNotification.post.location_name)
+                } else {
+                  removeCountryBorders()
+                }
+                
                 // Zoom to location
                 map.current.flyTo({
                   center: [liveNotification.post.longitude, liveNotification.post.latitude],
-                  zoom: 8,
+                  zoom: 6,
                   duration: 2000
                 })
                 setLiveNotification(prev => ({ ...prev, show: false }))
@@ -1245,122 +1006,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Expanded Popup Overlay */}
-      {expandedPopup.isOpen && expandedPopup.message && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={closeExpandedPopup}
-          />
-          
-          {/* Expanded Popup Content */}
-          <div className="relative bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                          <div className="flex items-center space-x-3">
-              <div className="w-3 h-3 bg-white rounded-full"></div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  📢 {expandedPopup.message.channel_name || expandedPopup.message.channel || 'Unknown Channel'}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {new Date(expandedPopup.message.date).toLocaleString()}
-                </p>
-              </div>
-            </div>
-              <button
-                onClick={closeExpandedPopup}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
-              {/* Message Details */}
-              <div className="mb-6">
-                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
-                  <div>
-                    <span className="font-medium">Location:</span>
-                    <br />
-                    {expandedPopup.message.location_name || `${expandedPopup.message.latitude.toFixed(4)}, ${expandedPopup.message.longitude.toFixed(4)}`}
-                  </div>
-                  {expandedPopup.message.country_code && (
-                    <div>
-                      <span className="font-medium">Country:</span>
-                      <br />
-                      {expandedPopup.message.country_code}
-                    </div>
-                  )}
-                  {expandedPopup.message.views && (
-                    <div>
-                      <span className="font-medium">Views:</span>
-                      <br />
-                      {expandedPopup.message.views.toLocaleString()}
-                    </div>
-                  )}
-                  {expandedPopup.message.forwards && (
-                    <div>
-                      <span className="font-medium">Forwards:</span>
-                      <br />
-                      {expandedPopup.message.forwards.toLocaleString()}
-                    </div>
-                  )}
-                </div>
-                
-                {/* Media indicators */}
-                {(expandedPopup.message.has_photo || expandedPopup.message.has_video) && (
-                  <div className="mb-4 flex gap-2">
-                    {expandedPopup.message.has_photo && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        📷 Photo
-                      </span>
-                    )}
-                    {expandedPopup.message.has_video && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        🎥 Video
-                      </span>
-                    )}
-                  </div>
-                )}
-                
-                {/* Full Message Text */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Full Message:</h4>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                    {expandedPopup.message.text}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Footer */}
-            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-              <div className="text-sm text-gray-500">
-                Click outside to close
-              </div>
-              {expandedPopup.message.post_id && expandedPopup.message.channel_username && (
-                <a
-                  href={`https://t.me/${String(expandedPopup.message.channel_username).replace('@', '')}/${expandedPopup.message.post_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
-                  </svg>
-                  View on Telegram
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 } 
