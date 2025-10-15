@@ -62,14 +62,29 @@ export default function Home() {
     
     console.log(`🗺️ Zooming to: ${locationName || 'Unknown'} (${latitude}, ${longitude})`)
     
+    // Determine zoom level based on location type
+    let zoomLevel = 8 // Default city level zoom
+    
+    // Check if this is a country-only location
+    if (locationName && isCountryOnlyLocation(locationName)) {
+      zoomLevel = 4 // Country level zoom
+      console.log(`🌍 Country-level location detected: ${locationName} - using country zoom level`)
+      
+      // Stop rotation when zooming to country-level locations
+      stopIdleRotation()
+      console.log(`🛑 Rotation stopped for country-level inspection: ${locationName}`)
+    } else {
+      // For city/region level locations, use higher zoom
+      zoomLevel = 8
+      console.log(`🏙️ City-level location: ${locationName} - using city zoom level`)
+    }
+    
     map.current.flyTo({
       center: [longitude, latitude],
-      zoom: 8,
+      zoom: zoomLevel,
       duration: 2000,
       essential: true
     })
-    
-    
   }
 
   // Initialize Supabase client
@@ -170,7 +185,6 @@ export default function Home() {
       
       // Stop rotation at high zoom levels (following Mapbox example)
       if (zoom >= maxSpinZoom) {
-        console.log(`🛑 Rotation paused at zoom level ${zoom.toFixed(1)} (max: ${maxSpinZoom})`)
         rotationAnimationRef.current = requestAnimationFrame(animateRotation)
         return
       }
@@ -181,7 +195,6 @@ export default function Home() {
       if (zoom > slowSpinZoom) {
         const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom)
         rotationSpeed *= zoomDif
-        console.log(`🐌 Rotation slowed at zoom level ${zoom.toFixed(1)} (speed: ${(rotationSpeed * 100).toFixed(1)}%)`)
       }
       
       const currentBearing = map.current.getBearing()
@@ -265,27 +278,22 @@ export default function Home() {
           
           // Add idle rotation handlers
           map.current.on('mousedown', () => {
-            console.log('🛑 Map interaction detected - stopping idle rotation')
             stopIdleRotation()
           })
           
           map.current.on('dragstart', () => {
-            console.log('🛑 Map drag started - stopping idle rotation')
             stopIdleRotation()
           })
           
           map.current.on('rotatestart', () => {
-            console.log('🛑 Map rotation started - stopping idle rotation')
             stopIdleRotation()
           })
           
           map.current.on('pitchstart', () => {
-            console.log('🛑 Map pitch started - stopping idle rotation')
             stopIdleRotation()
           })
           
           map.current.on('zoomstart', () => {
-            console.log('🛑 Map zoom started - stopping idle rotation')
             stopIdleRotation()
           })
         })
@@ -373,6 +381,47 @@ export default function Home() {
     }
   }, [])
 
+  // Helper function to check if location is country-level only
+  const isCountryOnlyLocation = (locationName: string) => {
+    if (!locationName) return false
+    
+    // List of common country names that should not show dots
+    const countryOnlyNames = [
+      'United States', 'China', 'India', 'Russia', 'Brazil', 'Canada', 'Australia',
+      'Germany', 'France', 'United Kingdom', 'Italy', 'Spain', 'Japan', 'South Korea',
+      'Mexico', 'Indonesia', 'Netherlands', 'Saudi Arabia', 'Turkey', 'Switzerland',
+      'Belgium', 'Israel', 'Austria', 'Sweden', 'Poland', 'Norway', 'Denmark',
+      'Finland', 'Chile', 'New Zealand', 'Ireland', 'Portugal', 'Greece', 'Czech Republic',
+      'Romania', 'Hungary', 'Bulgaria', 'Croatia', 'Slovakia', 'Slovenia', 'Estonia',
+      'Latvia', 'Lithuania', 'Malta', 'Cyprus', 'Luxembourg', 'Iceland', 'Liechtenstein',
+      'Monaco', 'San Marino', 'Vatican City', 'Andorra', 'Ukraine', 'Belarus', 'Moldova',
+      'Georgia', 'Armenia', 'Azerbaijan', 'Kazakhstan', 'Uzbekistan', 'Kyrgyzstan',
+      'Tajikistan', 'Turkmenistan', 'Afghanistan', 'Pakistan', 'Bangladesh', 'Sri Lanka',
+      'Nepal', 'Bhutan', 'Maldives', 'Mongolia', 'North Korea', 'Taiwan', 'Hong Kong',
+      'Macau', 'Singapore', 'Malaysia', 'Thailand', 'Vietnam', 'Cambodia', 'Laos',
+      'Myanmar', 'Philippines', 'Indonesia', 'Brunei', 'East Timor', 'Papua New Guinea',
+      'Fiji', 'Samoa', 'Tonga', 'Vanuatu', 'Solomon Islands', 'Palau', 'Micronesia',
+      'Marshall Islands', 'Kiribati', 'Tuvalu', 'Nauru', 'South Africa', 'Egypt',
+      'Nigeria', 'Ethiopia', 'Kenya', 'Tanzania', 'Uganda', 'Ghana', 'Morocco',
+      'Algeria', 'Tunisia', 'Libya', 'Sudan', 'Chad', 'Niger', 'Mali', 'Burkina Faso',
+      'Senegal', 'Guinea', 'Sierra Leone', 'Liberia', 'Ivory Coast', 'Ghana', 'Togo',
+      'Benin', 'Cameroon', 'Central African Republic', 'Democratic Republic of the Congo',
+      'Republic of the Congo', 'Gabon', 'Equatorial Guinea', 'Sao Tome and Principe',
+      'Angola', 'Zambia', 'Zimbabwe', 'Botswana', 'Namibia', 'Lesotho', 'Swaziland',
+      'Madagascar', 'Mauritius', 'Seychelles', 'Comoros', 'Cape Verde', 'Guinea-Bissau',
+      'Gambia', 'Mauritania', 'Djibouti', 'Eritrea', 'Somalia', 'Rwanda', 'Burundi',
+      'Malawi', 'Mozambique', 'Zambia', 'Zimbabwe', 'Botswana', 'Namibia', 'Lesotho',
+      'Swaziland', 'South Africa', 'Argentina', 'Brazil', 'Chile', 'Uruguay', 'Paraguay',
+      'Bolivia', 'Peru', 'Ecuador', 'Colombia', 'Venezuela', 'Guyana', 'Suriname',
+      'French Guiana', 'Panama', 'Costa Rica', 'Nicaragua', 'Honduras', 'El Salvador',
+      'Guatemala', 'Belize', 'Jamaica', 'Cuba', 'Haiti', 'Dominican Republic',
+      'Puerto Rico', 'Trinidad and Tobago', 'Barbados', 'Saint Lucia', 'Saint Vincent',
+      'Grenada', 'Antigua and Barbuda', 'Saint Kitts and Nevis', 'Dominica'
+    ]
+    
+    return countryOnlyNames.includes(locationName)
+  }
+
   // Load and plot posts
   const loadAndPlotMessages = async () => {
     try {
@@ -391,11 +440,12 @@ export default function Home() {
       
       const messages = responseData.posts
       console.log(`📍 Processing ${messages.length} posts`)
-      
-      // Filter posts that have location data (latitude and longitude)
+
+      // Filter posts that have location data (latitude and longitude) but exclude country-only locations
       const postsWithLocations = messages.filter((msg: any) => 
         msg.latitude !== null && msg.longitude !== null && 
-        msg.latitude !== undefined && msg.longitude !== undefined
+        msg.latitude !== undefined && msg.longitude !== undefined &&
+        !isCountryOnlyLocation(msg.location_name)
       )
       
       console.log(`📍 Found ${postsWithLocations.length} posts with location data`)
@@ -799,6 +849,12 @@ export default function Home() {
   const addNewPostToMap = (newPost: any) => {
     if (!map.current || !map.current.getSource('telegram-points')) {
       console.log('⚠️ Map not ready, skipping new post')
+      return
+    }
+
+    // Skip country-only locations (don't show dots for them)
+    if (isCountryOnlyLocation(newPost.location_name)) {
+      console.log('📍 Skipping country-only location:', newPost.location_name)
       return
     }
 
