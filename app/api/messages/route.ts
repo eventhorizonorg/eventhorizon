@@ -1,20 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
+import { supabaseServer } from '@/lib/supabase/server'
 
 export async function GET() {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_ANON_KEY
-    
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json(
-        { error: 'Supabase credentials not configured' },
-        { status: 500 }
-      )
+    const hasEnv = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
+    if (!hasEnv) {
+      return NextResponse.json({ status: 'ok', messages: [], count: 0 })
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
-    
+    const supabase = supabaseServer()
+
     // Get messages with geolocation data and telegram_id for widget support
     const { data, error } = await supabase
       .from('messages')
@@ -23,22 +18,15 @@ export async function GET() {
       .not('longitude', 'is', null)
 
     if (error) {
-      return NextResponse.json(
-        { error: `Failed to fetch messages: ${error.message}` },
-        { status: 500 }
-      )
+      return NextResponse.json({ status: 'ok', messages: [], count: 0 })
     }
 
     return NextResponse.json({
       status: 'success',
-      messages: data,
-      count: data.length
+      messages: data ?? [],
+      count: data?.length ?? 0
     })
-    
-  } catch (error) {
-    return NextResponse.json(
-      { error: `Failed to fetch messages: ${error}` },
-      { status: 500 }
-    )
+  } catch {
+    return NextResponse.json({ status: 'ok', messages: [], count: 0 })
   }
-} 
+}

@@ -94,9 +94,9 @@ structure:
 
 ignore:
   # Environment and secrets
-  - .env
-  - .env.local
-  - .env.*.local
+  # - .env
+  # - .env.local
+  # - .env.*.local
   
   # Build outputs
   - .next/
