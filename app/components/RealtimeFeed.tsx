@@ -76,7 +76,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           
           // Sort by date and take latest 5
           const latestPosts = uniquePosts
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .sort((a: FeedPost, b: FeedPost) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 5)
           
           console.log(`📍 Feed loaded ${latestPosts.length} posts`)
