@@ -62,29 +62,92 @@ export default function Home() {
     
     console.log(`🗺️ Zooming to: ${locationName || 'Unknown'} (${latitude}, ${longitude})`)
     
-    // Determine zoom level based on location type
-    let zoomLevel = 8 // Default city level zoom
-    
-    // Check if this is a country-only location
+    // Check if this is a country-level location
     if (locationName && isCountryOnlyLocation(locationName)) {
-      zoomLevel = 4 // Country level zoom
-      console.log(`🌍 Country-level location detected: ${locationName} - using country zoom level`)
+      console.log(`🌍 Country-level location detected: ${locationName} - showing country borders`)
       
-      // Stop rotation when zooming to country-level locations
-      stopIdleRotation()
-      console.log(`🛑 Rotation stopped for country-level inspection: ${locationName}`)
+      // Add country border visualization
+      addCountryBorders(locationName)
     } else {
-      // For city/region level locations, use higher zoom
-      zoomLevel = 8
-      console.log(`🏙️ City-level location: ${locationName} - using city zoom level`)
+      // Remove any existing country borders for city-level locations
+      removeCountryBorders()
     }
     
     map.current.flyTo({
       center: [longitude, latitude],
-      zoom: zoomLevel,
+      zoom: 6,
       duration: 2000,
       essential: true
     })
+  }
+
+  // Function to add country border visualization
+  const addCountryBorders = (countryName: string) => {
+    if (!map.current) return
+
+    // Remove existing country borders first
+    removeCountryBorders()
+
+    try {
+      // Add country border source and layer
+      map.current.addSource('country-borders', {
+        type: 'vector',
+        url: 'mapbox://mapbox.country-boundaries-v1'
+      })
+
+      map.current.addLayer({
+        id: 'country-borders-fill',
+        type: 'fill',
+        source: 'country-borders',
+        'source-layer': 'country_boundaries',
+        filter: ['==', 'name_en', countryName],
+        paint: {
+          'fill-color': '#ffffff',
+          'fill-opacity': 0.1
+        }
+      })
+
+      map.current.addLayer({
+        id: 'country-borders-stroke',
+        type: 'line',
+        source: 'country-borders',
+        'source-layer': 'country_boundaries',
+        filter: ['==', 'name_en', countryName],
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 2,
+          'line-opacity': 0.8
+        }
+      })
+
+      console.log(`🗺️ Added country borders for: ${countryName}`)
+    } catch (error) {
+      console.error('❌ Error adding country borders:', error)
+    }
+  }
+
+  // Function to remove country border visualization
+  const removeCountryBorders = () => {
+    if (!map.current) return
+
+    try {
+      // Remove layers
+      if (map.current.getLayer('country-borders-fill')) {
+        map.current.removeLayer('country-borders-fill')
+      }
+      if (map.current.getLayer('country-borders-stroke')) {
+        map.current.removeLayer('country-borders-stroke')
+      }
+
+      // Remove source
+      if (map.current.getSource('country-borders')) {
+        map.current.removeSource('country-borders')
+      }
+
+      console.log('🗺️ Removed country borders')
+    } catch (error) {
+      console.error('❌ Error removing country borders:', error)
+    }
   }
 
   // Initialize Supabase client
@@ -375,6 +438,8 @@ export default function Home() {
       return () => {
         console.log('🔌 Cleaning up real-time subscription')
         subscription.unsubscribe()
+      // Clean up country borders
+      removeCountryBorders()
       }
     } catch (error) {
       console.error('❌ Error setting up real-time subscription:', error)
@@ -390,6 +455,7 @@ export default function Home() {
       'United States', 'China', 'India', 'Russia', 'Brazil', 'Canada', 'Australia',
       'Germany', 'France', 'United Kingdom', 'Italy', 'Spain', 'Japan', 'South Korea',
       'Mexico', 'Indonesia', 'Netherlands', 'Saudi Arabia', 'Turkey', 'Switzerland',
+      'Iran',
       'Belgium', 'Israel', 'Austria', 'Sweden', 'Poland', 'Norway', 'Denmark',
       'Finland', 'Chile', 'New Zealand', 'Ireland', 'Portugal', 'Greece', 'Czech Republic',
       'Romania', 'Hungary', 'Bulgaria', 'Croatia', 'Slovakia', 'Slovenia', 'Estonia',
@@ -554,165 +620,24 @@ export default function Home() {
           const locationName = props.location_name || 'Unknown Location'
           
           // Determine zoom level based on location specificity
-          let zoomLevel = 8 // Default zoom for general areas
+          let zoomLevel = 6 // Default zoom for general areas (more zoomed out)
           
           // Check if it's a city-specific location
           if (locationName.toLowerCase().includes('city') || 
               locationName.toLowerCase().includes('town') ||
               locationName.toLowerCase().includes('village') ||
               locationName.includes(',')) {
-            zoomLevel = 12 // City level zoom
+            zoomLevel = 9 // City level zoom (more zoomed out)
           }
           // Check if it's a country-level location
-          else if (locationName === 'United States' || 
-                   locationName === 'China' || 
-                   locationName === 'Russia' ||
-                   locationName === 'Brazil' ||
-                   locationName === 'Canada' ||
-                   locationName === 'Australia' ||
-                   locationName === 'India' ||
-                   locationName === 'France' ||
-                   locationName === 'Germany' ||
-                   locationName === 'United Kingdom' ||
-                   locationName === 'Italy' ||
-                   locationName === 'Spain' ||
-                   locationName === 'Japan' ||
-                   locationName === 'South Korea' ||
-                   locationName === 'Mexico' ||
-                   locationName === 'Argentina' ||
-                   locationName === 'South Africa' ||
-                   locationName === 'Nigeria' ||
-                   locationName === 'Egypt' ||
-                   locationName === 'Turkey' ||
-                   locationName === 'Iran' ||
-                   locationName === 'Saudi Arabia' ||
-                   locationName === 'Indonesia' ||
-                   locationName === 'Thailand' ||
-                   locationName === 'Vietnam' ||
-                   locationName === 'Philippines' ||
-                   locationName === 'Malaysia' ||
-                   locationName === 'Singapore' ||
-                   locationName === 'Israel' ||
-                   locationName === 'Palestine' ||
-                   locationName === 'Syria' ||
-                   locationName === 'Iraq' ||
-                   locationName === 'Afghanistan' ||
-                   locationName === 'Pakistan' ||
-                   locationName === 'Bangladesh' ||
-                   locationName === 'Sri Lanka' ||
-                   locationName === 'Myanmar' ||
-                   locationName === 'Cambodia' ||
-                   locationName === 'Laos' ||
-                   locationName === 'Mongolia' ||
-                   locationName === 'Kazakhstan' ||
-                   locationName === 'Uzbekistan' ||
-                   locationName === 'Ukraine' ||
-                   locationName === 'Poland' ||
-                   locationName === 'Romania' ||
-                   locationName === 'Bulgaria' ||
-                   locationName === 'Greece' ||
-                   locationName === 'Portugal' ||
-                   locationName === 'Netherlands' ||
-                   locationName === 'Belgium' ||
-                   locationName === 'Switzerland' ||
-                   locationName === 'Austria' ||
-                   locationName === 'Sweden' ||
-                   locationName === 'Norway' ||
-                   locationName === 'Denmark' ||
-                   locationName === 'Finland' ||
-                   locationName === 'Ireland' ||
-                   locationName === 'Iceland' ||
-                   locationName === 'New Zealand' ||
-                   locationName === 'Chile' ||
-                   locationName === 'Peru' ||
-                   locationName === 'Colombia' ||
-                   locationName === 'Venezuela' ||
-                   locationName === 'Ecuador' ||
-                   locationName === 'Bolivia' ||
-                   locationName === 'Paraguay' ||
-                   locationName === 'Uruguay' ||
-                   locationName === 'Guyana' ||
-                   locationName === 'Suriname' ||
-                   locationName === 'French Guiana' ||
-                   locationName === 'Madagascar' ||
-                   locationName === 'Mali' ||
-                   locationName === 'Niger' ||
-                   locationName === 'Chad' ||
-                   locationName === 'Sudan' ||
-                   locationName === 'Ethiopia' ||
-                   locationName === 'Kenya' ||
-                   locationName === 'Tanzania' ||
-                   locationName === 'Uganda' ||
-                   locationName === 'Rwanda' ||
-                   locationName === 'Burundi' ||
-                   locationName === 'Democratic Republic of the Congo' ||
-                   locationName === 'Republic of the Congo' ||
-                   locationName === 'Central African Republic' ||
-                   locationName === 'Cameroon' ||
-                   locationName === 'Gabon' ||
-                   locationName === 'Equatorial Guinea' ||
-                   locationName === 'São Tomé and Príncipe' ||
-                   locationName === 'Angola' ||
-                   locationName === 'Zambia' ||
-                   locationName === 'Zimbabwe' ||
-                   locationName === 'Botswana' ||
-                   locationName === 'Namibia' ||
-                   locationName === 'Lesotho' ||
-                   locationName === 'Swaziland' ||
-                   locationName === 'Mozambique' ||
-                   locationName === 'Malawi' ||
-                   locationName === 'Zambia' ||
-                   locationName === 'Algeria' ||
-                   locationName === 'Tunisia' ||
-                   locationName === 'Libya' ||
-                   locationName === 'Morocco' ||
-                   locationName === 'Western Sahara' ||
-                   locationName === 'Mauritania' ||
-                   locationName === 'Senegal' ||
-                   locationName === 'Gambia' ||
-                   locationName === 'Guinea-Bissau' ||
-                   locationName === 'Guinea' ||
-                   locationName === 'Sierra Leone' ||
-                   locationName === 'Liberia' ||
-                   locationName === 'Ivory Coast' ||
-                   locationName === 'Ghana' ||
-                   locationName === 'Togo' ||
-                   locationName === 'Benin' ||
-                   locationName === 'Burkina Faso' ||
-                   locationName === 'Qatar' ||
-                   locationName === 'United Arab Emirates' ||
-                   locationName === 'Kuwait' ||
-                   locationName === 'Bahrain' ||
-                   locationName === 'Oman' ||
-                   locationName === 'Yemen' ||
-                   locationName === 'Jordan' ||
-                   locationName === 'Lebanon' ||
-                   locationName === 'Cyprus' ||
-                   locationName === 'Georgia' ||
-                   locationName === 'Armenia' ||
-                   locationName === 'Azerbaijan' ||
-                   locationName === 'Belarus' ||
-                   locationName === 'Moldova' ||
-                   locationName === 'Lithuania' ||
-                   locationName === 'Latvia' ||
-                   locationName === 'Estonia' ||
-                   locationName === 'Slovenia' ||
-                   locationName === 'Croatia' ||
-                   locationName === 'Bosnia and Herzegovina' ||
-                   locationName === 'Serbia' ||
-                   locationName === 'Montenegro' ||
-                   locationName === 'North Macedonia' ||
-                   locationName === 'Albania' ||
-                   locationName === 'Kosovo' ||
-                   locationName === 'Malta' ||
-                   locationName === 'Luxembourg' ||
-                   locationName === 'Liechtenstein' ||
-                   locationName === 'Monaco' ||
-                   locationName === 'San Marino' ||
-                   locationName === 'Vatican City' ||
-                   locationName === 'Andorra' ||
-                   locationName === 'Palestinian Authority') {
-            zoomLevel = 6 // Country level zoom
+          else if (isCountryOnlyLocation(locationName)) {
+            zoomLevel = 3 // Country level zoom (more zoomed out)
+            
+            // Add country border visualization for country-level locations
+            addCountryBorders(locationName)
+          } else {
+            // Remove country borders for city-level locations
+            removeCountryBorders()
           }
           
           // Smooth zoom to location
@@ -1030,15 +955,22 @@ export default function Home() {
       {/* Live notification */}
       {liveNotification.show && (
         <div className="absolute top-16 right-4 z-50 max-w-sm">
-          {console.log('🔔 Rendering live notification:', liveNotification)}
           <div 
             className="bg-black/80 backdrop-blur-sm rounded-lg p-4 border border-white/20 cursor-pointer hover:bg-black/90 transition-all duration-300 group"
             onClick={() => {
               if (liveNotification.post && map.current) {
+                // Check if this is a country-level location
+                if (liveNotification.post.location_name && isCountryOnlyLocation(liveNotification.post.location_name)) {
+                  console.log(`🌍 Country-level location detected: ${liveNotification.post.location_name} - showing country borders`)
+                  addCountryBorders(liveNotification.post.location_name)
+                } else {
+                  removeCountryBorders()
+                }
+                
                 // Zoom to location
                 map.current.flyTo({
                   center: [liveNotification.post.longitude, liveNotification.post.latitude],
-                  zoom: 8,
+                  zoom: 6,
                   duration: 2000
                 })
                 setLiveNotification(prev => ({ ...prev, show: false }))
