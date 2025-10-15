@@ -261,11 +261,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
               {/* Post Header */}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
-                  <span className="text-white text-xs font-medium truncate flex items-center space-x-1">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="white"/>
-                    </svg>
-                    <span>{post.channel_name}</span>
+                  <span className="text-white text-xs font-medium truncate">
+                    📢 {post.channel_name}
                   </span>
                   {post.has_photo && <span className="text-blue-400 text-xs">📷</span>}
                   {post.has_video && <span className="text-purple-400 text-xs">🎥</span>}
@@ -276,35 +273,30 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
               </div>
 
               {/* Post Content */}
-              <p className="text-white/90 text-xs leading-relaxed mb-2">
+              <p className="text-white/90 text-sm leading-relaxed mb-2">
                 {truncateText(post.text)}
               </p>
 
               {/* Post Footer */}
-              <div className="flex items-center justify-between text-xs text-white/60 min-h-[20px]">
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
+              <div className="flex items-center justify-between text-xs text-white/60">
+                <div className="flex items-center space-x-2">
                   {post.location_name && (
-                    <span className="flex items-center space-x-1 flex-shrink-0">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22S19 14.25 19 9C19 5.13 15.87 2 12 2ZM12 11.5C10.62 11.5 9.5 10.38 9.5 9S10.62 6.5 12 6.5S14.5 7.62 14.5 9S13.38 11.5 12 11.5Z" fill="white"/>
-                      </svg>
-                      <span className="truncate">{post.location_name}</span>
-                    </span>
+                    <span>📍 {post.location_name}</span>
                   )}
                   {post.country_code && (
-                    <span className="flex-shrink-0">🌍 {post.country_code}</span>
+                    <span>🌍 {post.country_code}</span>
                   )}
                 </div>
-                <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                <div className="flex items-center space-x-2">
                   {post.channel_username && (
                     <a
                       href={`https://t.me/${post.channel_username.replace('@', '')}/${post.post_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 transition-colors text-[10px] whitespace-nowrap"
+                      className="text-blue-400 hover:text-blue-300 transition-colors"
                       onClick={(e) => e.stopPropagation()} // Prevent parent click
                     >
-                      View on Telegram
+                      View →
                     </a>
                   )}
                 </div>

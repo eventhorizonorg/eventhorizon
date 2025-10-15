@@ -43,8 +43,6 @@ export async function GET() {
           locations_master!inner(id, name, latitude, longitude, canonical_name)
         `)
         .in('post_id', postIds)
-        .not('locations_master.latitude', 'is', null)
-        .not('locations_master.longitude', 'is', null)
         .order('post_id', { ascending: false })
 
       if (!locationsError) {
