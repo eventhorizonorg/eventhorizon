@@ -920,108 +920,12 @@ export default function Home() {
       />
       
       {/* Real-time Feed Component - Top Right */}
-      <RealtimeFeed onZoomToLocation={zoomToCoordinates} />
-      
-      {/* Real-time notifications overlay */}
-      <div className="absolute top-4 left-4 z-50 space-y-2 pointer-events-none">
-        {notifications.map((notification) => (
-          <div
-            key={notification.id}
-            className={`
-              bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 max-w-sm
-              transform transition-all duration-500 ease-out pointer-events-auto
-              ${notification.isVisible 
-                ? 'translate-x-0 opacity-100 scale-100' 
-                : 'translate-x-full opacity-0 scale-95'
-              }
-            `}
-            style={{
-              boxShadow: '0 8px 32px rgba(255, 255, 255, 0.1)',
-              animation: notification.isVisible ? 'notificationPulse 2s ease-in-out' : 'none'
-            }}
-          >
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-white text-sm font-semibold">
-                    📢 {notification.message.channel}
-                  </span>
-                  <span className="text-gray-400 text-xs">
-                    {new Date(notification.message.date).toLocaleTimeString()}
-                  </span>
-                </div>
-                <p className="text-white text-sm leading-relaxed line-clamp-3">
-                  {notification.message.text}
-                </p>
-                {notification.message.country_code && (
-                  <div className="mt-2">
-                    <span className="text-gray-400 text-xs">
-                      🌍 {notification.message.country_code}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <RealtimeFeed 
+        onZoomToLocation={zoomToCoordinates} 
+        notifications={notifications}
+        liveNotification={liveNotification}
+      />
 
-      {/* Live notification */}
-      {liveNotification.show && (
-        <div className="absolute top-16 right-4 z-50 max-w-sm">
-          <div 
-            className="bg-black/80 backdrop-blur-sm rounded-lg p-4 border border-white/20 cursor-pointer hover:bg-black/90 transition-all duration-300 group"
-            onClick={() => {
-              if (liveNotification.post && map.current) {
-                // Check if this is a country-level location
-                if (liveNotification.post.location_name && isCountryOnlyLocation(liveNotification.post.location_name)) {
-                  console.log(`🌍 Country-level location detected: ${liveNotification.post.location_name} - showing country borders`)
-                  addCountryBorders(liveNotification.post.location_name)
-                } else {
-                  removeCountryBorders()
-                }
-                
-                // Zoom to location
-                map.current.flyTo({
-                  center: [liveNotification.post.longitude, liveNotification.post.latitude],
-                  zoom: 6,
-                  duration: 2000
-                })
-                setLiveNotification(prev => ({ ...prev, show: false }))
-              }
-            }}
-            onMouseEnter={(e) => {
-              // Expand on hover
-              e.currentTarget.style.transform = 'scale(1.05)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)'
-            }}
-          >
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mt-2 flex-shrink-0"></div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-red-400 text-xs font-bold">NEW EVENT</span>
-                  <span className="text-white/60 text-xs">•</span>
-                  <span className="text-white text-xs font-medium truncate">
-                    {liveNotification.channel}
-                  </span>
-                </div>
-                <p className="text-white/90 text-sm leading-relaxed group-hover:text-white transition-colors">
-                  {liveNotification.text}
-                </p>
-                <div className="mt-2 text-xs text-white/60">
-                  Click to zoom to location
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )
