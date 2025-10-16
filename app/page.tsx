@@ -28,12 +28,6 @@ interface NewMessage {
   detected_language?: string
 }
 
-interface Notification {
-  id: string
-  message: NewMessage
-  timestamp: number
-  isVisible: boolean
-}
 
 
 export default function Home() {
@@ -47,14 +41,7 @@ export default function Home() {
   const rotationStartTime = useRef<number>(0)
   
   // Real-time state
-  const [notifications, setNotifications] = useState<Notification[]>([])
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
-  const [liveNotification, setLiveNotification] = useState<{
-    show: boolean
-    channel: string
-    text: string
-    post: any
-  }>({ show: false, channel: '', text: '', post: null })
   const supabaseRef = useRef<any>(null)
   const subscriptionRef = useRef<any>(null)
 
@@ -427,8 +414,7 @@ export default function Home() {
                   // Check if location data is available
                   if (latestPost.latitude && latestPost.longitude) {
                     console.log('📍 Adding new post to map with location:', latestPost)
-                    addNewPostToMap(latestPost)
-                    showNewPostNotification(latestPost)
+                  addNewPostToMap(latestPost)
                   } else if (retryCount < 3) {
                     // Location data not ready yet, retry after a short delay
                     console.log(`🔄 Location data not ready for post ${newPost.id}, retrying in 1s... (attempt ${retryCount + 1}/3)`)
@@ -437,7 +423,6 @@ export default function Home() {
                     // Add post without location data after max retries
                     console.log(`⚠️ Adding post ${newPost.id} without location data after ${retryCount} retries`)
                     addNewPostToMap(latestPost)
-                    showNewPostNotification(latestPost)
                   }
                 } else {
                   console.log('❌ New post not found in API response')
@@ -737,30 +722,30 @@ export default function Home() {
     }
 
     // Set up event listeners to manage user interaction
-    map.current.on('mousedown', () => { 
+    map.current.on('mousedown', () => {
       userInteracting = true
       if (animationId) {
         clearTimeout(animationId)
         animationId = null
       }
     })
-    
-    map.current.on('mouseup', () => { 
+
+    map.current.on('mouseup', () => {
       userInteracting = false
       setTimeout(() => spinGlobe(), 100) // Small delay to prevent immediate restart
     })
-    
-    map.current.on('dragend', () => { 
+
+    map.current.on('dragend', () => {
       userInteracting = false
       setTimeout(() => spinGlobe(), 100)
     })
     
-    map.current.on('pitchend', () => { 
+    map.current.on('pitchend', () => {
       userInteracting = false
       setTimeout(() => spinGlobe(), 100)
     })
     
-    map.current.on('rotateend', () => { 
+    map.current.on('rotateend', () => {
       userInteracting = false
       setTimeout(() => spinGlobe(), 100)
     })
@@ -852,72 +837,6 @@ export default function Home() {
     }
   }
 
-  // Show notification for new post
-  const showNewPostNotification = (newPost: any) => {
-    // Show live notification
-    const truncatedText = newPost.text.length > 100 
-      ? newPost.text.substring(0, 100) + '...'
-      : newPost.text
-
-    console.log('🔔 Setting live notification:', {
-      show: true,
-      channel: newPost.channel_name || newPost.channel || 'Unknown Channel',
-      text: truncatedText,
-      post: newPost
-    })
-    
-    setLiveNotification({
-      show: true,
-      channel: newPost.channel_name || newPost.channel || 'Unknown Channel',
-      text: truncatedText,
-      post: newPost
-    })
-
-    // Auto-hide after 8 seconds
-    setTimeout(() => {
-      setLiveNotification(prev => ({ ...prev, show: false }))
-    }, 8000)
-
-    // Also add to regular notifications
-    const notification: Notification = {
-      id: `new-post-${newPost.id}-${Date.now()}`,
-      message: {
-        id: newPost.id,
-        post_id: newPost.post_id,
-        text: newPost.text,
-        date: newPost.date,
-        channel: newPost.channel,
-        channel_username: newPost.channel_username,
-        latitude: newPost.latitude,
-        longitude: newPost.longitude,
-        location_name: newPost.location_name,
-        country_code: newPost.country_code,
-        has_photo: newPost.has_photo,
-        has_video: newPost.has_video,
-        detected_language: newPost.detected_language
-      },
-      timestamp: Date.now(),
-      isVisible: true
-    }
-
-    setNotifications(prev => [notification, ...prev.slice(0, 4)]) // Keep max 5 notifications
-
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notification.id 
-            ? { ...n, isVisible: false }
-            : n
-        )
-      )
-      
-      // Remove from array after fade out
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== notification.id))
-      }, 500)
-    }, 5000)
-  }
 
   return (
     <div className="relative w-full h-screen">
@@ -934,7 +853,6 @@ export default function Home() {
       {/* Real-time Feed Component - Top Right */}
       <RealtimeFeed 
         onZoomToLocation={zoomToCoordinates} 
-        notifications={notifications}
       />
 
 

@@ -22,33 +22,11 @@ interface FeedPost extends Post {
   longitude?: number | null
 }
 
-interface Notification {
-  id: string
-  message: {
-    id: number
-    post_id: number
-    text: string
-    date: string
-    channel: string
-    channel_username: string
-    latitude: number
-    longitude: number
-    location_name?: string
-    country_code?: string
-    has_photo?: boolean
-    has_video?: boolean
-    detected_language?: string
-  }
-  timestamp: number
-  isVisible: boolean
-}
-
 interface RealtimeFeedProps {
   onZoomToLocation?: (latitude: number, longitude: number, locationName?: string, postId?: number) => void
-  notifications?: Notification[]
 }
 
-export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: RealtimeFeedProps) {
+export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
@@ -333,9 +311,9 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: R
             'bg-gray-500'
           }`}></div>
           <span className="text-white text-sm font-semibold hover:scale-105 transition-transform duration-200">Live Feed</span>
-          {(newPostCount > 0 || notifications.length > 0) && (
+          {newPostCount > 0 && (
             <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
-              {newPostCount + notifications.length} new
+              {newPostCount} new
             </span>
           )}
         </div>
@@ -361,49 +339,7 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: R
             {/* Posts */}
             <div className="text-white/60 text-xs font-medium uppercase tracking-wide mb-1">Latest Posts</div>
             
-            {/* Notifications as posts */}
-            {notifications.length > 0 && notifications.slice(0, 3).map((notification, index) => (
-              <div
-                key={notification.id}
-                className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-300 cursor-pointer ${
-                  isAnimating ? 'animate-fadeOutDown' : 'animate-fadeInUp'
-                } hover:bg-white/10 mb-3`}
-                style={{ animationDelay: isAnimating ? `${(notifications.length - index - 1) * 25}ms` : `${index * 50}ms` }}
-                onClick={() => {
-                  if (notification.message.latitude && notification.message.longitude && onZoomToLocation) {
-                    onZoomToLocation(notification.message.latitude, notification.message.longitude, notification.message.location_name || undefined, notification.message.id)
-                  }
-                }}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white text-xs font-medium truncate flex items-center">
-                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,16.5L18,9.5L16.5,8L11,13.5L7.5,10L6,11.5L11,16.5Z"/>
-                      </svg>
-                      {notification.message.channel}
-                    </span>
-                  </div>
-                  <span className="text-white/60 text-xs">
-                    {new Date(notification.message.date).toLocaleTimeString()}
-                  </span>
-                </div>
-                <p className="text-white/90 text-sm leading-relaxed mb-2">
-                  {notification.message.text.length > 80 
-                    ? notification.message.text.substring(0, 80) + '...' 
-                    : notification.message.text
-                  }
-                </p>
-                {notification.message.country_code && (
-                  <div className="text-xs text-white/60">
-                    🌍 {notification.message.country_code}
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            {/* Regular posts */}
-            {posts.length === 0 && notifications.length === 0 ? (
+            {posts.length === 0 ? (
               <div className="text-white/60 text-sm text-center py-4">
                 No posts available
               </div>
