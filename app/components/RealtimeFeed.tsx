@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabaseClient } from '@/lib/supabase/client'
 
 interface Post {
@@ -31,6 +31,133 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   const [loading, setLoading] = useState(true)
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
   const [newPostCount, setNewPostCount] = useState(0)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMorePosts, setHasMorePosts] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const postRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const [expandedPostId, setExpandedPostId] = useState<number | null>(null)
+  const [isExpanding, setIsExpanding] = useState(false)
+
+
+  // Handle toggle with animation
+  const handleToggle = () => {
+    if (isAnimating) return // Prevent multiple clicks during animation
+    
+    if (isExpanded) {
+      // Collapsing - start fade out animation
+      setIsAnimating(true)
+      setTimeout(() => {
+        setIsExpanded(false)
+        setIsAnimating(false)
+      }, 150) // Match fadeOutDown duration
+    } else {
+      // Expanding - immediate
+      setIsExpanded(true)
+    }
+  }
+
+  // Load more posts for pagination
+  const loadMorePosts = async () => {
+    if (loadingMore || !hasMorePosts) return
+    
+    setLoadingMore(true)
+    try {
+      const response = await fetch(`/api/feed?page=${currentPage + 1}&limit=20`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.posts && data.posts.length > 0) {
+        const newPosts = data.posts.map((post: any) => ({
+          id: post.id,
+          channel_name: post.channel,
+          channel_username: post.channel_username,
+          post_id: post.post_id,
+          date: post.date,
+          text: post.text,
+          has_photo: post.has_photo,
+          has_video: post.has_video,
+          detected_language: post.detected_language,
+          location_name: post.location_name,
+          country_code: post.country_code,
+          latitude: post.latitude,
+          longitude: post.longitude
+        }))
+        
+        setPosts(prev => [...prev, ...newPosts])
+        setCurrentPage(prev => prev + 1)
+        
+        // Check if we have more posts based on API response
+        if (!data.hasMore) {
+          setHasMorePosts(false)
+        }
+      } else {
+        setHasMorePosts(false)
+      }
+    } catch (error) {
+      console.error('❌ Error loading more posts:', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  // Handle scroll for load more functionality
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return
+    
+    const container = scrollContainerRef.current
+    const scrollTop = container.scrollTop
+    const scrollHeight = container.scrollHeight
+    const clientHeight = container.clientHeight
+    
+    // Load more when near bottom
+    if (scrollTop + clientHeight >= scrollHeight - 200 && hasMorePosts && !loadingMore) {
+      loadMorePosts()
+    }
+  }
+
+  // Handle post expansion with fade animations and map zoom
+  const handlePostClick = (post: FeedPost) => {
+    if (isExpanding) return // Prevent clicks during animation
+    
+    if (expandedPostId === post.id) {
+      // Collapsing - start fade out animation
+      setIsExpanding(true)
+      setTimeout(() => {
+        setExpandedPostId(null)
+        setIsExpanding(false)
+      }, 200) // Match fadeOut duration
+    } else {
+      // Expanding - immediate
+      setExpandedPostId(post.id)
+      // Smoothly scroll the clicked post into view within the feed
+      requestAnimationFrame(() => {
+        const container = scrollContainerRef.current
+        const target = postRefs.current.get(post.id)
+        if (container && target) {
+          const desiredTop = Math.max(target.offsetTop - 8, 0)
+          const maxTop = Math.max(container.scrollHeight - container.clientHeight, 0)
+          container.scrollTo({ top: Math.min(desiredTop, maxTop), behavior: 'smooth' })
+        }
+      })
+      
+      // Also zoom to location if available
+      if (post.latitude && post.longitude && onZoomToLocation) {
+        onZoomToLocation(post.latitude, post.longitude, post.location_name || undefined, post.id)
+      }
+    }
+  }
 
   // Load initial posts
   useEffect(() => {
@@ -74,10 +201,10 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
             return acc
           }, [])
           
-          // Sort by date and take latest 5
+          // Sort by date and take latest 20 for better scrolling
           const latestPosts = uniquePosts
             .sort((a: FeedPost, b: FeedPost) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .slice(0, 5)
+            .slice(0, 20)
           
           console.log(`📍 Feed loaded ${latestPosts.length} posts`)
           setPosts(latestPosts)
@@ -107,51 +234,100 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           table: 'posts'
         }, async (payload) => {
           console.log('🆕 New post received in feed:', payload.new)
-          console.log('🔍 Payload details:', JSON.stringify(payload, null, 2))
-          
-          // Fetch the complete post data
-          try {
-            const response = await fetch('/api/feed', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        })
-            const data = await response.json()
-            
-            if (data.posts && data.posts.length > 0) {
-              // Find the new post
-              const newPost = data.posts.find((post: any) => post.id === payload.new.id)
-              if (newPost) {
-                console.log('📍 Adding new post to feed:', newPost)
-                
-                const feedPost: FeedPost = {
-                  id: newPost.id,
-                  channel_name: newPost.channel,
-                  channel_username: newPost.channel_username,
-                  post_id: newPost.post_id,
-                  date: newPost.date,
-                  text: newPost.text,
-                  has_photo: newPost.has_photo,
-                  has_video: newPost.has_video,
-                  detected_language: newPost.detected_language,
-                  location_name: newPost.location_name,
-                  country_code: newPost.country_code,
-                  latitude: newPost.latitude,
-                  longitude: newPost.longitude
-                }
-                
-                // Add to the beginning of the list and keep only 5
-                setPosts(prev => [feedPost, ...prev.slice(0, 4)])
-                setNewPostCount(prev => prev + 1)
-                
-                // Reset new post count after 3 seconds
-                setTimeout(() => setNewPostCount(0), 3000)
-              }
+          // Filter out large embedding data from console log
+          const filteredPayload = {
+            ...payload,
+            new: {
+              id: payload.new.id,
+              channel_name: payload.new.channel_name,
+              channel_username: payload.new.channel_username,
+              post_id: payload.new.post_id,
+              date: payload.new.date,
+              text: payload.new.text,
+              has_photo: payload.new.has_photo,
+              has_video: payload.new.has_video,
+              detected_language: payload.new.detected_language
+              // Excluding embedding, embedding_dimensions, embedding_model for smaller payload
             }
-          } catch (error) {
-            console.error('❌ Error fetching new post data:', error)
           }
+          console.log('🔍 Filtered payload details:', JSON.stringify(filteredPayload, null, 2))
+          
+          // Fetch the complete post data with retry for location data
+          const fetchPostWithRetry = async (retryCount = 0) => {
+            try {
+              const response = await fetch('/api/feed', {
+                cache: 'no-store',
+                headers: {
+                  'Cache-Control': 'no-cache'
+                }
+              })
+              const data = await response.json()
+              
+              if (data.posts && data.posts.length > 0) {
+                // Find the new post
+                const newPost = data.posts.find((post: any) => post.id === payload.new.id)
+                if (newPost) {
+                  console.log('📍 Adding new post to feed:', newPost)
+                  
+                  // Check if location data is available
+                  if (newPost.latitude && newPost.longitude) {
+                    const feedPost: FeedPost = {
+                      id: newPost.id,
+                      channel_name: newPost.channel,
+                      channel_username: newPost.channel_username,
+                      post_id: newPost.post_id,
+                      date: newPost.date,
+                      text: newPost.text,
+                      has_photo: newPost.has_photo,
+                      has_video: newPost.has_video,
+                      detected_language: newPost.detected_language,
+                      location_name: newPost.location_name,
+                      country_code: newPost.country_code,
+                      latitude: newPost.latitude,
+                      longitude: newPost.longitude
+                    }
+                    
+                    // Add to the beginning of the list and keep only 5
+                    setPosts(prev => [feedPost, ...prev.slice(0, 4)])
+                    setNewPostCount(prev => prev + 1)
+                    
+                    // Reset new post count after 3 seconds
+                    setTimeout(() => setNewPostCount(0), 3000)
+                  } else if (retryCount < 3) {
+                    // Location data not ready yet, retry after a short delay
+                    console.log(`🔄 Location data not ready for post ${payload.new.id}, retrying in 1s... (attempt ${retryCount + 1}/3)`)
+                    setTimeout(() => fetchPostWithRetry(retryCount + 1), 1000)
+                  } else {
+                    // Add post without location data after max retries
+                    console.log(`⚠️ Adding post ${payload.new.id} without location data after ${retryCount} retries`)
+                    const feedPost: FeedPost = {
+                      id: newPost.id,
+                      channel_name: newPost.channel,
+                      channel_username: newPost.channel_username,
+                      post_id: newPost.post_id,
+                      date: newPost.date,
+                      text: newPost.text,
+                      has_photo: newPost.has_photo,
+                      has_video: newPost.has_video,
+                      detected_language: newPost.detected_language,
+                      location_name: newPost.location_name,
+                      country_code: newPost.country_code,
+                      latitude: newPost.latitude,
+                      longitude: newPost.longitude
+                    }
+                    
+                    setPosts(prev => [feedPost, ...prev.slice(0, 4)])
+                    setNewPostCount(prev => prev + 1)
+                    setTimeout(() => setNewPostCount(0), 3000)
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('❌ Error fetching new post data:', error)
+            }
+          }
+          
+          fetchPostWithRetry()
         })
         .subscribe((status, err) => {
           console.log('📡 Feed real-time subscription status:', status)
@@ -200,132 +376,193 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
 
   if (loading) {
     return (
-      <div className="fixed top-4 right-4 z-50 w-80 rounded-lg p-4">
-        <div className="flex items-center space-x-2 mb-3">
-          <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-          <span className="text-white text-sm font-medium">Loading Feed...</span>
-        </div>
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="h-4 bg-white/20 rounded mb-2"></div>
-              <div className="h-3 bg-white/10 rounded w-3/4"></div>
-            </div>
-          ))}
+      <div className="fixed top-4 right-4 z-50 bg-black/80 backdrop-blur-sm rounded-lg">
+        <div className="flex items-center justify-between p-4 cursor-pointer" onClick={handleToggle}>
+          <div className={`flex items-center space-x-2 transition-all duration-300 ease-in-out ${
+            isExpanded ? 'transform -translate-x-2' : 'transform translate-x-0'
+          }`}>
+            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+            <span className="text-white text-sm font-medium hover:scale-105 transition-transform duration-200">Loading Feed...</span>
+          </div>
+          <svg 
+            className={`w-4 h-4 text-white/60 transition-all duration-300 ease-in-out ml-4 ${
+              isExpanded ? 'rotate-180 transform translate-x-2' : 'rotate-0 transform translate-x-0'
+            }`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 w-80 rounded-lg p-4 max-h-[70vh] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
+    <div className={`fixed top-4 right-4 z-50 backdrop-blur-sm rounded-lg transition-all duration-300 ease-in-out ${
+      isExpanded ? 'w-80' : 'w-auto'
+    }`}>
+      {/* Header - Always visible */}
+      <div 
+        className="flex items-center justify-between p-4 cursor-pointer"
+        onClick={handleToggle}
+      >
+        <div className={`flex items-center space-x-2 transition-all duration-300 ease-in-out ${
+          isExpanded ? 'transform -translate-x-2' : 'transform translate-x-0'
+        }`}>
           <div className={`w-2 h-2 rounded-full ${
             realtimeStatus === 'connected' ? 'bg-green-500 animate-pulse' :
             realtimeStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
             realtimeStatus === 'failed' ? 'bg-red-500' :
             'bg-gray-500'
           }`}></div>
-          <span className="text-white text-sm font-semibold">Live Feed</span>
+          <span className="text-white text-sm font-semibold hover:scale-105 transition-transform duration-200">Live Feed</span>
           {newPostCount > 0 && (
             <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">
               {newPostCount} new
             </span>
           )}
         </div>
+        <svg 
+          className={`w-4 h-4 text-white/60 transition-all duration-300 ease-in-out ml-4 ${
+            isExpanded ? 'rotate-180 transform translate-x-2' : 'rotate-0 transform translate-x-0'
+          }`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </div>
 
-      {/* Posts List */}
-      <div className="space-y-3 overflow-y-auto max-h-[60vh] pr-2">
-        {posts.length === 0 ? (
-          <div className="text-white/60 text-sm text-center py-4">
-            No posts available
+      {/* Posts List - Only visible when expanded */}
+      {(isExpanded || isAnimating) && (
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out relative mt-2 ${
+          isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
+        }`}>
+          <div 
+            ref={scrollContainerRef}
+            className="px-4 pt-3 pb-4 space-y-2 overflow-y-auto max-h-[40vh] pr-2 feed-fade-bottom-half"
+            onScroll={handleScroll}
+          >
+            
+            {/* Posts */}
+            
+            {posts.length === 0 ? (
+              <div className="text-white/60 text-sm text-center py-4">
+                No posts available
+              </div>
+            ) : (
+              <>
+                {/* Simple scrolling without virtual scrolling for now */}
+                {posts.map((post, index) => (
+                  <div
+                    key={post.id}
+                    ref={(el) => {
+                      if (el) {
+                        postRefs.current.set(post.id, el)
+                      } else {
+                        postRefs.current.delete(post.id)
+                      }
+                    }}
+                    className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-500 cursor-pointer mb-3 ${
+                      index === 0 && newPostCount > 0 
+                        ? 'bg-red-500/10 animate-pulse' 
+                        : 'hover:bg-white/10'
+                    } ${
+                      expandedPostId === post.id ? 'ring-2 ring-blue-500/50 animate-slide-into' : ''
+                    }`}
+                    onClick={() => handlePostClick(post)}
+                  >
+                  {/* Post Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-white text-xs font-medium truncate flex items-center">
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </svg>
+                        {post.channel_name}
+                      </span>
+                      {post.has_photo && (
+                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H20V6H4M6,8A1,1 0 0,1 7,9A1,1 0 0,1 6,10A1,1 0 0,1 5,9A1,1 0 0,1 6,8M12,19L18,13L16.59,11.59L12,16.17L9.41,13.59L8,15L12,19Z"/>
+                        </svg>
+                      )}
+                      {post.has_video && (
+                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M17,10.5V7A1,1 0 0,0 16,6H4A1,1 0 0,0 3,7V17A1,1 0 0,0 4,18H16A1,1 0 0,0 17,17V13.5L21,17.5V6.5L17,10.5Z"/>
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-white/60 text-xs">
+                      {formatTime(post.date)}
+                    </span>
+                  </div>
+
+                  {/* Post Content */}
+                  <div className="mb-2">
+                    <p className="text-white/90 text-xs leading-relaxed transition-all duration-300">
+                      {expandedPostId === post.id ? post.text : truncateText(post.text)}
+                    </p>
+                  </div>
+
+                  {/* Post Footer */}
+                  <div className="flex items-center justify-between text-xs text-white/60">
+                    <div className="flex items-center space-x-2">
+                      {post.location_name && (
+                        <span className="flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12,2C8.13,2 5,5.13 5,9C5,14.25 12,22 12,22S19,14.25 19,9C19,5.13 15.87,2 12,2M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5Z"/>
+                          </svg>
+                          {post.location_name}
+                        </span>
+                      )}
+                      {post.country_code && (
+                        <span className="flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
+                          </svg>
+                          {post.country_code}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {post.channel_username && (
+                        <a
+                          href={`https://t.me/${post.channel_username.replace('@', '')}/${post.post_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 transition-colors"
+                          onClick={(e) => e.stopPropagation()} // Prevent parent click
+                        >
+                          View →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  </div>
+                ))}
+                
+                {/* Load more indicator */}
+                {loadingMore && (
+                  <div className="text-white/60 text-sm text-center py-4">
+                    Loading more posts...
+                  </div>
+                )}
+                
+                {!hasMorePosts && posts.length > 0 && (
+                  <div className="text-white/40 text-xs text-center py-2">
+                    No more posts to load
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        ) : (
-          posts.map((post, index) => (
-            <div
-              key={post.id}
-              className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-300 cursor-pointer ${
-                index === 0 && newPostCount > 0 
-                  ? 'bg-red-500/10 animate-pulse' 
-                  : 'hover:bg-white/10'
-              }`}
-              onClick={() => {
-                if (post.latitude && post.longitude && onZoomToLocation) {
-                  onZoomToLocation(post.latitude, post.longitude, post.location_name || undefined, post.id)
-                }
-              }}
-            >
-              {/* Post Header */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-white text-xs font-medium truncate flex items-center">
-                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                    </svg>
-                    {post.channel_name}
-                  </span>
-                  {post.has_photo && (
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H20V6H4M6,8A1,1 0 0,1 7,9A1,1 0 0,1 6,10A1,1 0 0,1 5,9A1,1 0 0,1 6,8M12,19L18,13L16.59,11.59L12,16.17L9.41,13.59L8,15L12,19Z"/>
-                    </svg>
-                  )}
-                  {post.has_video && (
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M17,10.5V7A1,1 0 0,0 16,6H4A1,1 0 0,0 3,7V17A1,1 0 0,0 4,18H16A1,1 0 0,0 17,17V13.5L21,17.5V6.5L17,10.5Z"/>
-                    </svg>
-                  )}
-                </div>
-                <span className="text-white/60 text-xs">
-                  {formatTime(post.date)}
-                </span>
-              </div>
+          
+        </div>
+      )}
 
-              {/* Post Content */}
-              <p className="text-white/90 text-sm leading-relaxed mb-2">
-                {truncateText(post.text)}
-              </p>
-
-              {/* Post Footer */}
-              <div className="flex items-center justify-between text-xs text-white/60">
-                <div className="flex items-center space-x-2">
-                  {post.location_name && (
-                    <span className="flex items-center">
-                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12,2C8.13,2 5,5.13 5,9C5,14.25 12,22 12,22S19,14.25 19,9C19,5.13 15.87,2 12,2M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5Z"/>
-                      </svg>
-                      {post.location_name}
-                    </span>
-                  )}
-                  {post.country_code && (
-                    <span className="flex items-center">
-                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
-                      </svg>
-                      {post.country_code}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  {post.channel_username && (
-                    <a
-                      href={`https://t.me/${post.channel_username.replace('@', '')}/${post.post_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 transition-colors"
-                      onClick={(e) => e.stopPropagation()} // Prevent parent click
-                    >
-                      View →
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
 
     </div>
   )

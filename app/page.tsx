@@ -23,14 +23,11 @@ interface NewMessage {
   country_code?: string
   has_photo?: boolean
   has_video?: boolean
+  views?: number
+  forwards?: number
+  detected_language?: string
 }
 
-interface Notification {
-  id: string
-  message: NewMessage
-  timestamp: number
-  isVisible: boolean
-}
 
 
 export default function Home() {
@@ -38,20 +35,9 @@ export default function Home() {
   const map = useRef<mapboxgl.Map | null>(null)
   const pulseStart = useRef(Date.now())
   const geojsonRef = useRef<FeatureCollection<Point>>({ type: 'FeatureCollection', features: [] })
-  const [isIdle, setIsIdle] = useState(false)
-  const idleTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const rotationAnimationRef = useRef<number | null>(null)
-  const rotationStartTime = useRef<number>(0)
   
   // Real-time state
-  const [notifications, setNotifications] = useState<Notification[]>([])
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
-  const [liveNotification, setLiveNotification] = useState<{
-    show: boolean
-    channel: string
-    text: string
-    post: any
-  }>({ show: false, channel: '', text: '', post: null })
   const supabaseRef = useRef<any>(null)
   const subscriptionRef = useRef<any>(null)
 
@@ -68,17 +54,26 @@ export default function Home() {
       
       // Add country border visualization
       addCountryBorders(locationName)
+      
+      // Zoom out for country-level locations
+      map.current.flyTo({
+        center: [longitude, latitude],
+        zoom: 4,
+        duration: 2000,
+        essential: true
+      })
     } else {
       // Remove any existing country borders for city-level locations
       removeCountryBorders()
-    }
-    
+      
+      // Zoom in close for city/street-level locations
     map.current.flyTo({
       center: [longitude, latitude],
-      zoom: 6,
+        zoom: 10,
       duration: 2000,
       essential: true
     })
+    }
   }
 
   // Function to add country border visualization
@@ -209,93 +204,9 @@ export default function Home() {
   }
 
 
-  // Stop idle rotation
-  const stopIdleRotation = () => {
-    if (rotationAnimationRef.current) {
-      cancelAnimationFrame(rotationAnimationRef.current)
-      rotationAnimationRef.current = null
-    }
-    setIsIdle(false)
-  }
 
-  // Reset idle timer
-  const resetIdleTimer = () => {
-    if (idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current)
-    }
-    stopIdleRotation()
-    idleTimerRef.current = setTimeout(() => {
-      setIsIdle(true)
-      startIdleRotation()
-    }, 5000) // 5 seconds of inactivity
-  }
 
-  // Rotation configuration (following Mapbox example)
-  const maxSpinZoom = 5 // Above zoom level 5, do not rotate
-  const slowSpinZoom = 3 // Rotate at intermediate speeds between zoom levels 3 and 5
-  const baseRotationSpeed = 0.05 // Base rotation speed in degrees per second
 
-  // Start idle rotation
-  const startIdleRotation = () => {
-    if (!map.current || !isIdle) return
-    
-    rotationStartTime.current = Date.now()
-    
-    const animateRotation = () => {
-      if (!map.current || !isIdle) return
-      
-      const zoom = map.current.getZoom()
-      
-      // Stop rotation at high zoom levels (following Mapbox example)
-      if (zoom >= maxSpinZoom) {
-        rotationAnimationRef.current = requestAnimationFrame(animateRotation)
-        return
-      }
-      
-      let rotationSpeed = baseRotationSpeed
-      
-      // Slow down rotation at higher zoom levels (following Mapbox example)
-      if (zoom > slowSpinZoom) {
-        const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom)
-        rotationSpeed *= zoomDif
-      }
-      
-      const currentBearing = map.current.getBearing()
-      const newBearing = currentBearing + rotationSpeed
-      
-      map.current.easeTo({
-        bearing: newBearing,
-        duration: 1000
-      })
-      
-      rotationAnimationRef.current = requestAnimationFrame(animateRotation)
-    }
-    
-    animateRotation()
-  }
-
-  // Handle user activity
-  useEffect(() => {
-    const handleActivity = () => resetIdleTimer()
-    
-    // Add event listeners for user activity
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'wheel']
-    events.forEach(event => {
-      document.addEventListener(event, handleActivity, { passive: true })
-    })
-    
-    return () => {
-      events.forEach(event => {
-        document.removeEventListener(event, handleActivity)
-      })
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current)
-      }
-      if (rotationAnimationRef.current) {
-        cancelAnimationFrame(rotationAnimationRef.current)
-      }
-    }
-  }, [])
 
   // Initialize map and load data
   useEffect(() => {
@@ -318,7 +229,6 @@ export default function Home() {
           zoom: 1.5,
           projection: 'globe' as any,
           pitch: 0,
-          bearing: 0,
           attributionControl: false
         })
 
@@ -333,32 +243,6 @@ export default function Home() {
             logos.forEach(logo => logo.remove())
           }, 100)
           
-          // Initialize globe rotation
-          initGlobeRotation()
-          
-          // Start idle timer
-          resetIdleTimer()
-          
-          // Add idle rotation handlers
-          map.current.on('mousedown', () => {
-            stopIdleRotation()
-          })
-          
-          map.current.on('dragstart', () => {
-            stopIdleRotation()
-          })
-          
-          map.current.on('rotatestart', () => {
-            stopIdleRotation()
-          })
-          
-          map.current.on('pitchstart', () => {
-            stopIdleRotation()
-          })
-          
-          map.current.on('zoomstart', () => {
-            stopIdleRotation()
-          })
         })
 
         map.current.on('error', (e) => {
@@ -392,10 +276,23 @@ export default function Home() {
           schema: 'public',
           table: 'posts'
         }, (payload) => {
-          console.log('🆕 New post received:', payload.new)
+          // Filter out large embedding data from console log
+          const filteredNewPost = {
+            id: payload.new.id,
+            channel_name: payload.new.channel_name,
+            channel_username: payload.new.channel_username,
+            post_id: payload.new.post_id,
+            date: payload.new.date,
+            text: payload.new.text,
+            has_photo: payload.new.has_photo,
+            has_video: payload.new.has_video,
+            detected_language: payload.new.detected_language
+            // Excluding embedding, embedding_dimensions, embedding_model for smaller payload
+          }
+          console.log('🆕 New post received:', filteredNewPost)
           
-          // Handle the new post asynchronously
-          const handleNewPost = async () => {
+          // Handle the new post asynchronously with retry for location data
+          const handleNewPost = async (retryCount = 0) => {
             const newPost = payload.new
             console.log('🔍 Fetching complete post data for:', newPost.id)
             try {
@@ -408,9 +305,19 @@ export default function Home() {
                 const latestPost = data.posts.find((post: any) => post.id === newPost.id)
                 console.log('🔍 Looking for post ID:', newPost.id, 'Found:', !!latestPost)
                 if (latestPost) {
-                  console.log('📍 Adding new post to map:', latestPost)
+                  // Check if location data is available
+                  if (latestPost.latitude && latestPost.longitude) {
+                    console.log('📍 Adding new post to map with location:', latestPost)
                   addNewPostToMap(latestPost)
-                  showNewPostNotification(latestPost)
+                  } else if (retryCount < 3) {
+                    // Location data not ready yet, retry after a short delay
+                    console.log(`🔄 Location data not ready for post ${newPost.id}, retrying in 1s... (attempt ${retryCount + 1}/3)`)
+                    setTimeout(() => handleNewPost(retryCount + 1), 1000)
+                  } else {
+                    // Add post without location data after max retries
+                    console.log(`⚠️ Adding post ${newPost.id} without location data after ${retryCount} retries`)
+                    addNewPostToMap(latestPost)
+                  }
                 } else {
                   console.log('❌ New post not found in API response')
                 }
@@ -670,76 +577,6 @@ export default function Home() {
     }
   }
 
-  // Globe rotation functionality
-  const initGlobeRotation = () => {
-    if (!map.current) return
-
-    const secondsPerRevolution = 120 // Adjust for desired speed (2 minutes per revolution)
-    const maxSpinZoom = 5 // Maximum zoom level for spinning
-    const slowSpinZoom = 3 // Zoom level to start slowing spin
-    let userInteracting = false // Track user interaction
-    let spinEnabled = true // Control spin state
-    let animationId: number | null = null // Track animation frame
-
-    const spinGlobe = () => {
-      if (!map.current || animationId) return // Prevent multiple animations
-      
-      const zoom = map.current.getZoom()
-      if (spinEnabled && !userInteracting && zoom < maxSpinZoom) {
-        let distancePerSecond = 360 / secondsPerRevolution
-        if (zoom > slowSpinZoom) {
-          const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom)
-          distancePerSecond *= zoomDif
-        }
-        const center = map.current.getCenter()
-        center.lng -= distancePerSecond
-        
-        map.current.easeTo({ 
-          center, 
-          duration: 1000, 
-          easing: (n) => n 
-        })
-        
-        // Schedule next rotation
-        animationId = window.setTimeout(() => {
-          animationId = null
-          spinGlobe()
-        }, 1000)
-      }
-    }
-
-    // Set up event listeners to manage user interaction
-    map.current.on('mousedown', () => { 
-      userInteracting = true
-      if (animationId) {
-        clearTimeout(animationId)
-        animationId = null
-      }
-    })
-    
-    map.current.on('mouseup', () => { 
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100) // Small delay to prevent immediate restart
-    })
-    
-    map.current.on('dragend', () => { 
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100)
-    })
-    
-    map.current.on('pitchend', () => { 
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100)
-    })
-    
-    map.current.on('rotateend', () => { 
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100)
-    })
-
-    // Start the spinning animation
-    setTimeout(() => spinGlobe(), 1000) // Initial delay
-  }
 
   const animatePulse = () => {
     if (!map.current || !map.current.getSource('telegram-points')) {
@@ -824,71 +661,6 @@ export default function Home() {
     }
   }
 
-  // Show notification for new post
-  const showNewPostNotification = (newPost: any) => {
-    // Show live notification
-    const truncatedText = newPost.text.length > 100 
-      ? newPost.text.substring(0, 100) + '...'
-      : newPost.text
-
-    console.log('🔔 Setting live notification:', {
-      show: true,
-      channel: newPost.channel_name || newPost.channel || 'Unknown Channel',
-      text: truncatedText,
-      post: newPost
-    })
-    
-    setLiveNotification({
-      show: true,
-      channel: newPost.channel_name || newPost.channel || 'Unknown Channel',
-      text: truncatedText,
-      post: newPost
-    })
-
-    // Auto-hide after 8 seconds
-    setTimeout(() => {
-      setLiveNotification(prev => ({ ...prev, show: false }))
-    }, 8000)
-
-    // Also add to regular notifications
-    const notification: Notification = {
-      id: `new-post-${newPost.id}-${Date.now()}`,
-      message: {
-        id: newPost.id,
-        post_id: newPost.post_id,
-        text: newPost.text,
-        date: newPost.date,
-        channel: newPost.channel,
-        channel_username: newPost.channel_username,
-        latitude: newPost.latitude,
-        longitude: newPost.longitude,
-        location_name: newPost.location_name,
-        country_code: newPost.country_code,
-        has_photo: newPost.has_photo,
-        has_video: newPost.has_video,
-        detected_language: newPost.detected_language
-      },
-      isVisible: true
-    }
-
-    setNotifications(prev => [notification, ...prev.slice(0, 4)]) // Keep max 5 notifications
-
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notification.id 
-            ? { ...n, isVisible: false }
-            : n
-        )
-      )
-      
-      // Remove from array after fade out
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== notification.id))
-      }, 500)
-    }, 5000)
-  }
 
   return (
     <div className="relative w-full h-screen">
@@ -903,108 +675,10 @@ export default function Home() {
       />
       
       {/* Real-time Feed Component - Top Right */}
-      <RealtimeFeed onZoomToLocation={zoomToCoordinates} />
-      
-      {/* Real-time notifications overlay */}
-      <div className="absolute top-4 left-4 z-50 space-y-2 pointer-events-none">
-        {notifications.map((notification) => (
-          <div
-            key={notification.id}
-            className={`
-              bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 max-w-sm
-              transform transition-all duration-500 ease-out pointer-events-auto
-              ${notification.isVisible 
-                ? 'translate-x-0 opacity-100 scale-100' 
-                : 'translate-x-full opacity-0 scale-95'
-              }
-            `}
-            style={{
-              boxShadow: '0 8px 32px rgba(255, 255, 255, 0.1)',
-              animation: notification.isVisible ? 'notificationPulse 2s ease-in-out' : 'none'
-            }}
-          >
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-white text-sm font-semibold">
-                    📢 {notification.message.channel}
-                  </span>
-                  <span className="text-gray-400 text-xs">
-                    {new Date(notification.message.date).toLocaleTimeString()}
-                  </span>
-                </div>
-                <p className="text-white text-sm leading-relaxed line-clamp-3">
-                  {notification.message.text}
-                </p>
-                {notification.message.country_code && (
-                  <div className="mt-2">
-                    <span className="text-gray-400 text-xs">
-                      🌍 {notification.message.country_code}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <RealtimeFeed 
+        onZoomToLocation={zoomToCoordinates} 
+      />
 
-      {/* Live notification */}
-      {liveNotification.show && (
-        <div className="absolute top-16 right-4 z-50 max-w-sm">
-          <div 
-            className="bg-black/80 backdrop-blur-sm rounded-lg p-4 border border-white/20 cursor-pointer hover:bg-black/90 transition-all duration-300 group"
-            onClick={() => {
-              if (liveNotification.post && map.current) {
-                // Check if this is a country-level location
-                if (liveNotification.post.location_name && isCountryOnlyLocation(liveNotification.post.location_name)) {
-                  console.log(`🌍 Country-level location detected: ${liveNotification.post.location_name} - showing country borders`)
-                  addCountryBorders(liveNotification.post.location_name)
-                } else {
-                  removeCountryBorders()
-                }
-                
-                // Zoom to location
-                map.current.flyTo({
-                  center: [liveNotification.post.longitude, liveNotification.post.latitude],
-                  zoom: 6,
-                  duration: 2000
-                })
-                setLiveNotification(prev => ({ ...prev, show: false }))
-              }
-            }}
-            onMouseEnter={(e) => {
-              // Expand on hover
-              e.currentTarget.style.transform = 'scale(1.05)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)'
-            }}
-          >
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mt-2 flex-shrink-0"></div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-red-400 text-xs font-bold">NEW EVENT</span>
-                  <span className="text-white/60 text-xs">•</span>
-                  <span className="text-white text-xs font-medium truncate">
-                    {liveNotification.channel}
-                  </span>
-                </div>
-                <p className="text-white/90 text-sm leading-relaxed group-hover:text-white transition-colors">
-                  {liveNotification.text}
-                </p>
-                <div className="mt-2 text-xs text-white/60">
-                  Click to zoom to location
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )
