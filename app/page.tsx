@@ -67,12 +67,12 @@ export default function Home() {
       removeCountryBorders()
       
       // Zoom in close for city/street-level locations
-      map.current.flyTo({
-        center: [longitude, latitude],
+    map.current.flyTo({
+      center: [longitude, latitude],
         zoom: 10,
-        duration: 2000,
-        essential: true
-      })
+      duration: 2000,
+      essential: true
+    })
     }
   }
 

@@ -37,6 +37,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   const [hasMorePosts, setHasMorePosts] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const postRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null)
   const [isExpanding, setIsExpanding] = useState(false)
 
@@ -140,6 +141,16 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     } else {
       // Expanding - immediate
       setExpandedPostId(post.id)
+      // Smoothly scroll the clicked post into view within the feed
+      requestAnimationFrame(() => {
+        const container = scrollContainerRef.current
+        const target = postRefs.current.get(post.id)
+        if (container && target) {
+          const desiredTop = Math.max(target.offsetTop - 8, 0)
+          const maxTop = Math.max(container.scrollHeight - container.clientHeight, 0)
+          container.scrollTo({ top: Math.min(desiredTop, maxTop), behavior: 'smooth' })
+        }
+      })
       
       // Also zoom to location if available
       if (post.latitude && post.longitude && onZoomToLocation) {
@@ -427,7 +438,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
 
       {/* Posts List - Only visible when expanded */}
       {(isExpanded || isAnimating) && (
-        <div className={`overflow-hidden transition-all duration-300 ease-in-out relative ${
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out relative mt-2 ${
           isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
         }`}>
           <div 
@@ -448,12 +459,19 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                 {posts.map((post, index) => (
                   <div
                     key={post.id}
+                    ref={(el) => {
+                      if (el) {
+                        postRefs.current.set(post.id, el)
+                      } else {
+                        postRefs.current.delete(post.id)
+                      }
+                    }}
                     className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-500 cursor-pointer mb-3 ${
                       index === 0 && newPostCount > 0 
                         ? 'bg-red-500/10 animate-pulse' 
                         : 'hover:bg-white/10'
                     } ${
-                      expandedPostId === post.id ? 'ring-2 ring-blue-500/50' : ''
+                      expandedPostId === post.id ? 'ring-2 ring-blue-500/50 animate-slide-into' : ''
                     }`}
                     onClick={() => handlePostClick(post)}
                   >
