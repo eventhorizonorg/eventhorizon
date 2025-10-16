@@ -43,41 +43,19 @@ interface Notification {
   isVisible: boolean
 }
 
-interface LiveNotification {
-  show: boolean
-  channel: string
-  text: string
-  post: any
-}
-
 interface RealtimeFeedProps {
   onZoomToLocation?: (latitude: number, longitude: number, locationName?: string, postId?: number) => void
   notifications?: Notification[]
-  liveNotification?: LiveNotification
 }
 
-export default function RealtimeFeed({ onZoomToLocation, notifications = [], liveNotification }: RealtimeFeedProps) {
+export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: RealtimeFeedProps) {
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
   const [newPostCount, setNewPostCount] = useState(0)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
-  const [liveNotificationFading, setLiveNotificationFading] = useState(false)
 
-  // Handle live notification transition
-  useEffect(() => {
-    if (liveNotification?.show && isExpanded) {
-      // Start fade out animation after 3 seconds
-      const fadeTimer = setTimeout(() => {
-        setLiveNotificationFading(true)
-      }, 3000)
-      
-      return () => clearTimeout(fadeTimer)
-    } else if (!liveNotification?.show) {
-      setLiveNotificationFading(false)
-    }
-  }, [liveNotification?.show, isExpanded])
 
   // Handle toggle with animation
   const handleToggle = () => {
@@ -380,58 +358,9 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [], liv
             isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
           }`}>
             
-            {/* Live Notification - Show at top when available */}
-            {liveNotification?.show && !liveNotificationFading && (
-              <div className={`bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-3 transition-all duration-500 ease-out ${
-                liveNotificationFading ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
-              }`}>
-                <div className="flex items-start space-x-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mt-2 flex-shrink-0"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="text-red-400 text-xs font-bold">NEW EVENT</span>
-                      <span className="text-white/60 text-xs">•</span>
-                      <span className="text-white text-xs font-medium truncate">
-                        {liveNotification.channel}
-                      </span>
-                    </div>
-                    <p className="text-white/90 text-sm leading-relaxed">
-                      {liveNotification.text}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Posts */}
             <div className="text-white/60 text-xs font-medium uppercase tracking-wide mb-2">Latest Posts</div>
             
-            {/* Show live notification as regular post after fade */}
-            {liveNotification?.show && liveNotificationFading && (
-              <div className="bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-500 ease-out animate-fadeInUp hover:bg-white/10 mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white text-xs font-medium truncate flex items-center">
-                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,16.5L18,9.5L16.5,8L11,13.5L7.5,10L6,11.5L11,16.5Z"/>
-                      </svg>
-                      {liveNotification.channel}
-                    </span>
-                    <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full text-[10px]">LIVE</span>
-                  </div>
-                  <span className="text-white/60 text-xs">
-                    Just now
-                  </span>
-                </div>
-                <p className="text-white/90 text-sm leading-relaxed mb-2">
-                  {liveNotification.text.length > 80 
-                    ? liveNotification.text.substring(0, 80) + '...' 
-                    : liveNotification.text
-                  }
-                </p>
-              </div>
-            )}
-
             {/* Notifications as posts */}
             {notifications.slice(0, 3).map((notification, index) => (
               <div
@@ -481,13 +410,20 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [], liv
                 <div
                   key={post.id}
                   className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-300 cursor-pointer ${
-                    isAnimating ? 'animate-fadeOutDown' : 'animate-fadeInUp'
+                    isAnimating ? 'animate-fadeOutDown' : 
+                    index === 0 && newPostCount > 0 ? 'animate-fadeInUp' : 'animate-slideDown'
                   } ${
                     index === 0 && newPostCount > 0 
                       ? 'bg-red-500/10 animate-pulse' 
                       : 'hover:bg-white/10'
                   }`}
-                          style={{ animationDelay: isAnimating ? `${(posts.length - index - 1) * 25}ms` : `${index * 50}ms` }}
+                  style={{ 
+                    animationDelay: isAnimating 
+                      ? `${(posts.length - index - 1) * 25}ms` 
+                      : index === 0 && newPostCount > 0 
+                        ? '0ms' 
+                        : `${index * 100}ms`
+                  }}
                   onClick={() => {
                     if (post.latitude && post.longitude && onZoomToLocation) {
                       onZoomToLocation(post.latitude, post.longitude, post.location_name || undefined, post.id)

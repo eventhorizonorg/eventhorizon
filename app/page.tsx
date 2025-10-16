@@ -935,7 +935,6 @@ export default function Home() {
       <RealtimeFeed 
         onZoomToLocation={zoomToCoordinates} 
         notifications={notifications}
-        liveNotification={liveNotification}
       />
 
 
