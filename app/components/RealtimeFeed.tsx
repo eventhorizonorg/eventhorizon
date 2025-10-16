@@ -189,49 +189,82 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [], liv
           }
           console.log('🔍 Filtered payload details:', JSON.stringify(filteredPayload, null, 2))
           
-          // Fetch the complete post data
-          try {
-            const response = await fetch('/api/feed', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        })
-            const data = await response.json()
-            
-            if (data.posts && data.posts.length > 0) {
-              // Find the new post
-              const newPost = data.posts.find((post: any) => post.id === payload.new.id)
-              if (newPost) {
-                console.log('📍 Adding new post to feed:', newPost)
-                
-                const feedPost: FeedPost = {
-                  id: newPost.id,
-                  channel_name: newPost.channel,
-                  channel_username: newPost.channel_username,
-                  post_id: newPost.post_id,
-                  date: newPost.date,
-                  text: newPost.text,
-                  has_photo: newPost.has_photo,
-                  has_video: newPost.has_video,
-                  detected_language: newPost.detected_language,
-                  location_name: newPost.location_name,
-                  country_code: newPost.country_code,
-                  latitude: newPost.latitude,
-                  longitude: newPost.longitude
+          // Fetch the complete post data with retry for location data
+          const fetchPostWithRetry = async (retryCount = 0) => {
+            try {
+              const response = await fetch('/api/feed', {
+                cache: 'no-store',
+                headers: {
+                  'Cache-Control': 'no-cache'
                 }
-                
-                // Add to the beginning of the list and keep only 5
-                setPosts(prev => [feedPost, ...prev.slice(0, 4)])
-                setNewPostCount(prev => prev + 1)
-                
-                // Reset new post count after 3 seconds
-                setTimeout(() => setNewPostCount(0), 3000)
+              })
+              const data = await response.json()
+              
+              if (data.posts && data.posts.length > 0) {
+                // Find the new post
+                const newPost = data.posts.find((post: any) => post.id === payload.new.id)
+                if (newPost) {
+                  console.log('📍 Adding new post to feed:', newPost)
+                  
+                  // Check if location data is available
+                  if (newPost.latitude && newPost.longitude) {
+                    const feedPost: FeedPost = {
+                      id: newPost.id,
+                      channel_name: newPost.channel,
+                      channel_username: newPost.channel_username,
+                      post_id: newPost.post_id,
+                      date: newPost.date,
+                      text: newPost.text,
+                      has_photo: newPost.has_photo,
+                      has_video: newPost.has_video,
+                      detected_language: newPost.detected_language,
+                      location_name: newPost.location_name,
+                      country_code: newPost.country_code,
+                      latitude: newPost.latitude,
+                      longitude: newPost.longitude
+                    }
+                    
+                    // Add to the beginning of the list and keep only 5
+                    setPosts(prev => [feedPost, ...prev.slice(0, 4)])
+                    setNewPostCount(prev => prev + 1)
+                    
+                    // Reset new post count after 3 seconds
+                    setTimeout(() => setNewPostCount(0), 3000)
+                  } else if (retryCount < 3) {
+                    // Location data not ready yet, retry after a short delay
+                    console.log(`🔄 Location data not ready for post ${payload.new.id}, retrying in 1s... (attempt ${retryCount + 1}/3)`)
+                    setTimeout(() => fetchPostWithRetry(retryCount + 1), 1000)
+                  } else {
+                    // Add post without location data after max retries
+                    console.log(`⚠️ Adding post ${payload.new.id} without location data after ${retryCount} retries`)
+                    const feedPost: FeedPost = {
+                      id: newPost.id,
+                      channel_name: newPost.channel,
+                      channel_username: newPost.channel_username,
+                      post_id: newPost.post_id,
+                      date: newPost.date,
+                      text: newPost.text,
+                      has_photo: newPost.has_photo,
+                      has_video: newPost.has_video,
+                      detected_language: newPost.detected_language,
+                      location_name: newPost.location_name,
+                      country_code: newPost.country_code,
+                      latitude: newPost.latitude,
+                      longitude: newPost.longitude
+                    }
+                    
+                    setPosts(prev => [feedPost, ...prev.slice(0, 4)])
+                    setNewPostCount(prev => prev + 1)
+                    setTimeout(() => setNewPostCount(0), 3000)
+                  }
+                }
               }
+            } catch (error) {
+              console.error('❌ Error fetching new post data:', error)
             }
-          } catch (error) {
-            console.error('❌ Error fetching new post data:', error)
           }
+          
+          fetchPostWithRetry()
         })
         .subscribe((status, err) => {
           console.log('📡 Feed real-time subscription status:', status)

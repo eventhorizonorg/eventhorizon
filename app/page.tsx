@@ -410,8 +410,8 @@ export default function Home() {
           }
           console.log('🆕 New post received:', filteredNewPost)
           
-          // Handle the new post asynchronously
-          const handleNewPost = async () => {
+          // Handle the new post asynchronously with retry for location data
+          const handleNewPost = async (retryCount = 0) => {
             const newPost = payload.new
             console.log('🔍 Fetching complete post data for:', newPost.id)
             try {
@@ -424,9 +424,21 @@ export default function Home() {
                 const latestPost = data.posts.find((post: any) => post.id === newPost.id)
                 console.log('🔍 Looking for post ID:', newPost.id, 'Found:', !!latestPost)
                 if (latestPost) {
-                  console.log('📍 Adding new post to map:', latestPost)
-                  addNewPostToMap(latestPost)
-                  showNewPostNotification(latestPost)
+                  // Check if location data is available
+                  if (latestPost.latitude && latestPost.longitude) {
+                    console.log('📍 Adding new post to map with location:', latestPost)
+                    addNewPostToMap(latestPost)
+                    showNewPostNotification(latestPost)
+                  } else if (retryCount < 3) {
+                    // Location data not ready yet, retry after a short delay
+                    console.log(`🔄 Location data not ready for post ${newPost.id}, retrying in 1s... (attempt ${retryCount + 1}/3)`)
+                    setTimeout(() => handleNewPost(retryCount + 1), 1000)
+                  } else {
+                    // Add post without location data after max retries
+                    console.log(`⚠️ Adding post ${newPost.id} without location data after ${retryCount} retries`)
+                    addNewPostToMap(latestPost)
+                    showNewPostNotification(latestPost)
+                  }
                 } else {
                   console.log('❌ New post not found in API response')
                 }
