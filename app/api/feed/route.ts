@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const offset = (page - 1) * limit
+
     const hasEnv = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
     console.log('Feed API - Environment check:', {
       hasSupabaseUrl: !!process.env.SUPABASE_URL,
       hasSupabaseKey: !!process.env.SUPABASE_ANON_KEY,
-      urlPrefix: process.env.SUPABASE_URL?.substring(0, 20) + '...'
+      urlPrefix: process.env.SUPABASE_URL?.substring(0, 20) + '...',
+      page,
+      limit,
+      offset
     })
     
     if (!hasEnv) {
-      return NextResponse.json({ status: 'ok', posts: [], count: 0 })
+      return NextResponse.json({ status: 'ok', posts: [], count: 0, hasMore: false })
     }
 
     const supabase = supabaseServer()
@@ -25,7 +33,7 @@ export async function GET() {
       .select('id, channel_name, channel_username, post_id, date, text, has_photo, has_video, detected_language')
       .gte('date', twentyFourHoursAgo)
       .order('date', { ascending: false })
-      .limit(100)
+      .range(offset, offset + limit - 1)
 
     if (postsError) {
       console.error('Feed API - Posts query error:', postsError)
@@ -90,10 +98,16 @@ export async function GET() {
 
     console.log('Feed API - Transformed posts:', transformedPosts.length, 'posts')
 
+    // Check if there are more posts
+    const hasMore = transformedPosts.length === limit
+
     return NextResponse.json({
       status: 'success',
       posts: transformedPosts,
-      count: transformedPosts.length
+      count: transformedPosts.length,
+      hasMore,
+      page,
+      limit
     }, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',

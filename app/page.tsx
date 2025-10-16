@@ -35,10 +35,6 @@ export default function Home() {
   const map = useRef<mapboxgl.Map | null>(null)
   const pulseStart = useRef(Date.now())
   const geojsonRef = useRef<FeatureCollection<Point>>({ type: 'FeatureCollection', features: [] })
-  const [isIdle, setIsIdle] = useState(false)
-  const idleTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const rotationAnimationRef = useRef<number | null>(null)
-  const rotationStartTime = useRef<number>(0)
   
   // Real-time state
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
@@ -58,17 +54,26 @@ export default function Home() {
       
       // Add country border visualization
       addCountryBorders(locationName)
+      
+      // Zoom out for country-level locations
+      map.current.flyTo({
+        center: [longitude, latitude],
+        zoom: 4,
+        duration: 2000,
+        essential: true
+      })
     } else {
       // Remove any existing country borders for city-level locations
       removeCountryBorders()
+      
+      // Zoom in close for city/street-level locations
+      map.current.flyTo({
+        center: [longitude, latitude],
+        zoom: 10,
+        duration: 2000,
+        essential: true
+      })
     }
-    
-    map.current.flyTo({
-      center: [longitude, latitude],
-      zoom: 6,
-      duration: 2000,
-      essential: true
-    })
   }
 
   // Function to add country border visualization
@@ -199,93 +204,9 @@ export default function Home() {
   }
 
 
-  // Stop idle rotation
-  const stopIdleRotation = () => {
-    if (rotationAnimationRef.current) {
-      cancelAnimationFrame(rotationAnimationRef.current)
-      rotationAnimationRef.current = null
-    }
-    setIsIdle(false)
-  }
 
-  // Reset idle timer
-  const resetIdleTimer = () => {
-    if (idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current)
-    }
-    stopIdleRotation()
-    idleTimerRef.current = setTimeout(() => {
-      setIsIdle(true)
-      startIdleRotation()
-    }, 5000) // 5 seconds of inactivity
-  }
 
-  // Rotation configuration (following Mapbox example)
-  const maxSpinZoom = 5 // Above zoom level 5, do not rotate
-  const slowSpinZoom = 3 // Rotate at intermediate speeds between zoom levels 3 and 5
-  const baseRotationSpeed = 0.05 // Base rotation speed in degrees per second
 
-  // Start idle rotation
-  const startIdleRotation = () => {
-    if (!map.current || !isIdle) return
-    
-    rotationStartTime.current = Date.now()
-    
-    const animateRotation = () => {
-      if (!map.current || !isIdle) return
-      
-      const zoom = map.current.getZoom()
-      
-      // Stop rotation at high zoom levels (following Mapbox example)
-      if (zoom >= maxSpinZoom) {
-        rotationAnimationRef.current = requestAnimationFrame(animateRotation)
-        return
-      }
-      
-      let rotationSpeed = baseRotationSpeed
-      
-      // Slow down rotation at higher zoom levels (following Mapbox example)
-      if (zoom > slowSpinZoom) {
-        const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom)
-        rotationSpeed *= zoomDif
-      }
-      
-      const currentBearing = map.current.getBearing()
-      const newBearing = currentBearing + rotationSpeed
-      
-      map.current.easeTo({
-        bearing: newBearing,
-        duration: 1000
-      })
-      
-      rotationAnimationRef.current = requestAnimationFrame(animateRotation)
-    }
-    
-    animateRotation()
-  }
-
-  // Handle user activity
-  useEffect(() => {
-    const handleActivity = () => resetIdleTimer()
-    
-    // Add event listeners for user activity
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'wheel']
-    events.forEach(event => {
-      document.addEventListener(event, handleActivity, { passive: true })
-    })
-    
-    return () => {
-      events.forEach(event => {
-        document.removeEventListener(event, handleActivity)
-      })
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current)
-      }
-      if (rotationAnimationRef.current) {
-        cancelAnimationFrame(rotationAnimationRef.current)
-      }
-    }
-  }, [])
 
   // Initialize map and load data
   useEffect(() => {
@@ -308,7 +229,6 @@ export default function Home() {
           zoom: 1.5,
           projection: 'globe' as any,
           pitch: 0,
-          bearing: 0,
           attributionControl: false
         })
 
@@ -323,32 +243,6 @@ export default function Home() {
             logos.forEach(logo => logo.remove())
           }, 100)
           
-          // Initialize globe rotation
-          initGlobeRotation()
-          
-          // Start idle timer
-          resetIdleTimer()
-          
-          // Add idle rotation handlers
-          map.current?.on('mousedown', () => {
-            stopIdleRotation()
-          })
-          
-          map.current?.on('dragstart', () => {
-            stopIdleRotation()
-          })
-          
-          map.current?.on('rotatestart', () => {
-            stopIdleRotation()
-          })
-          
-          map.current?.on('pitchstart', () => {
-            stopIdleRotation()
-          })
-          
-          map.current?.on('zoomstart', () => {
-            stopIdleRotation()
-          })
         })
 
         map.current.on('error', (e) => {
@@ -683,76 +577,6 @@ export default function Home() {
     }
   }
 
-  // Globe rotation functionality
-  const initGlobeRotation = () => {
-    if (!map.current) return
-
-    const secondsPerRevolution = 120 // Adjust for desired speed (2 minutes per revolution)
-    const maxSpinZoom = 5 // Maximum zoom level for spinning
-    const slowSpinZoom = 3 // Zoom level to start slowing spin
-    let userInteracting = false // Track user interaction
-    let spinEnabled = true // Control spin state
-    let animationId: number | null = null // Track animation frame
-
-    const spinGlobe = () => {
-      if (!map.current || animationId) return // Prevent multiple animations
-      
-      const zoom = map.current.getZoom()
-      if (spinEnabled && !userInteracting && zoom < maxSpinZoom) {
-        let distancePerSecond = 360 / secondsPerRevolution
-        if (zoom > slowSpinZoom) {
-          const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom)
-          distancePerSecond *= zoomDif
-        }
-        const center = map.current.getCenter()
-        center.lng -= distancePerSecond
-        
-        map.current.easeTo({ 
-          center, 
-          duration: 1000, 
-          easing: (n) => n 
-        })
-        
-        // Schedule next rotation
-        animationId = window.setTimeout(() => {
-          animationId = null
-          spinGlobe()
-        }, 1000)
-      }
-    }
-
-    // Set up event listeners to manage user interaction
-    map.current.on('mousedown', () => {
-      userInteracting = true
-      if (animationId) {
-        clearTimeout(animationId)
-        animationId = null
-      }
-    })
-
-    map.current.on('mouseup', () => {
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100) // Small delay to prevent immediate restart
-    })
-
-    map.current.on('dragend', () => {
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100)
-    })
-    
-    map.current.on('pitchend', () => {
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100)
-    })
-    
-    map.current.on('rotateend', () => {
-      userInteracting = false
-      setTimeout(() => spinGlobe(), 100)
-    })
-
-    // Start the spinning animation
-    setTimeout(() => spinGlobe(), 1000) // Initial delay
-  }
 
   const animatePulse = () => {
     if (!map.current || !map.current.getSource('telegram-points')) {

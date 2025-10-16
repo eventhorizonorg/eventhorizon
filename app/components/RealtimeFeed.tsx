@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabaseClient } from '@/lib/supabase/client'
 
 interface Post {
@@ -33,6 +33,12 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   const [newPostCount, setNewPostCount] = useState(0)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMorePosts, setHasMorePosts] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [expandedPostId, setExpandedPostId] = useState<number | null>(null)
+  const [isExpanding, setIsExpanding] = useState(false)
 
 
   // Handle toggle with animation
@@ -49,6 +55,96 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     } else {
       // Expanding - immediate
       setIsExpanded(true)
+    }
+  }
+
+  // Load more posts for pagination
+  const loadMorePosts = async () => {
+    if (loadingMore || !hasMorePosts) return
+    
+    setLoadingMore(true)
+    try {
+      const response = await fetch(`/api/feed?page=${currentPage + 1}&limit=20`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.posts && data.posts.length > 0) {
+        const newPosts = data.posts.map((post: any) => ({
+          id: post.id,
+          channel_name: post.channel,
+          channel_username: post.channel_username,
+          post_id: post.post_id,
+          date: post.date,
+          text: post.text,
+          has_photo: post.has_photo,
+          has_video: post.has_video,
+          detected_language: post.detected_language,
+          location_name: post.location_name,
+          country_code: post.country_code,
+          latitude: post.latitude,
+          longitude: post.longitude
+        }))
+        
+        setPosts(prev => [...prev, ...newPosts])
+        setCurrentPage(prev => prev + 1)
+        
+        // Check if we have more posts based on API response
+        if (!data.hasMore) {
+          setHasMorePosts(false)
+        }
+      } else {
+        setHasMorePosts(false)
+      }
+    } catch (error) {
+      console.error('❌ Error loading more posts:', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  // Handle scroll for load more functionality
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return
+    
+    const container = scrollContainerRef.current
+    const scrollTop = container.scrollTop
+    const scrollHeight = container.scrollHeight
+    const clientHeight = container.clientHeight
+    
+    // Load more when near bottom
+    if (scrollTop + clientHeight >= scrollHeight - 200 && hasMorePosts && !loadingMore) {
+      loadMorePosts()
+    }
+  }
+
+  // Handle post expansion with fade animations and map zoom
+  const handlePostClick = (post: FeedPost) => {
+    if (isExpanding) return // Prevent clicks during animation
+    
+    if (expandedPostId === post.id) {
+      // Collapsing - start fade out animation
+      setIsExpanding(true)
+      setTimeout(() => {
+        setExpandedPostId(null)
+        setIsExpanding(false)
+      }, 200) // Match fadeOut duration
+    } else {
+      // Expanding - immediate
+      setExpandedPostId(post.id)
+      
+      // Also zoom to location if available
+      if (post.latitude && post.longitude && onZoomToLocation) {
+        onZoomToLocation(post.latitude, post.longitude, post.location_name || undefined, post.id)
+      }
     }
   }
 
@@ -94,10 +190,10 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
             return acc
           }, [])
           
-          // Sort by date and take latest 5
+          // Sort by date and take latest 20 for better scrolling
           const latestPosts = uniquePosts
             .sort((a: FeedPost, b: FeedPost) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .slice(0, 5)
+            .slice(0, 20)
           
           console.log(`📍 Feed loaded ${latestPosts.length} posts`)
           setPosts(latestPosts)
@@ -331,10 +427,14 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
 
       {/* Posts List - Only visible when expanded */}
       {(isExpanded || isAnimating) && (
-        <div className="overflow-hidden transition-all duration-300 ease-in-out">
-          <div className={`px-4 pb-4 space-y-2 overflow-y-auto max-h-[60vh] pr-2 ${
-            isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
-          }`}>
+        <div className="overflow-hidden transition-all duration-300 ease-in-out relative">
+          <div 
+            ref={scrollContainerRef}
+            className={`px-4 pb-4 space-y-2 overflow-y-auto max-h-[40vh] pr-2 ${
+              isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
+            }`}
+            onScroll={handleScroll}
+          >
             
             {/* Posts */}
             <div className="text-white/60 text-xs font-medium uppercase tracking-wide mb-1">Latest Posts</div>
@@ -344,28 +444,30 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                 No posts available
               </div>
             ) : (
-              posts.map((post, index) => (
-                <div
-                  key={post.id}
-                  className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-300 cursor-pointer ${
-                    isAnimating ? 'animate-fadeOutDown' : 
-                    index === 0 && newPostCount > 0 ? 'animate-fadeInUp' : 'animate-fadeInUp'
-                  } ${
-                    index === 0 && newPostCount > 0 
-                      ? 'bg-red-500/10 animate-pulse' 
-                      : 'hover:bg-white/10'
-                  }`}
-                  style={{ 
-                    animationDelay: isAnimating 
-                      ? `${(posts.length - index - 1) * 25}ms` 
-                      : `${index * 50}ms`
-                  }}
-                  onClick={() => {
-                    if (post.latitude && post.longitude && onZoomToLocation) {
-                      onZoomToLocation(post.latitude, post.longitude, post.location_name || undefined, post.id)
-                    }
-                  }}
-                >
+              <>
+                {/* Simple scrolling without virtual scrolling for now */}
+                {posts.map((post, index) => (
+                  <div
+                    key={post.id}
+                    className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-500 cursor-pointer mb-3 ${
+                      isAnimating ? 'animate-fadeOutDown' : 
+                      index === 0 && newPostCount > 0 ? 'animate-fadeInUp' : 'animate-fadeInUp'
+                    } ${
+                      index === 0 && newPostCount > 0 
+                        ? 'bg-red-500/10 animate-pulse' 
+                        : 'hover:bg-white/10'
+                    } ${
+                      expandedPostId === post.id ? 'ring-2 ring-blue-500/50' : ''
+                    } ${
+                      isExpanding && expandedPostId === post.id ? 'animate-fadeOut' : ''
+                    }`}
+                    style={{ 
+                      animationDelay: isAnimating 
+                        ? `${(posts.length - index - 1) * 25}ms` 
+                        : `${index * 50}ms`
+                    }}
+                    onClick={() => handlePostClick(post)}
+                  >
                   {/* Post Header */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
@@ -392,9 +494,13 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                   </div>
 
                   {/* Post Content */}
-                  <p className="text-white/90 text-sm leading-relaxed mb-2">
-                    {truncateText(post.text)}
-                  </p>
+                  <div className="mb-2">
+                    <p className={`text-white/90 text-xs leading-relaxed transition-all duration-300 ${
+                      expandedPostId === post.id ? 'animate-fadeIn' : ''
+                    }`}>
+                      {expandedPostId === post.id ? post.text : truncateText(post.text)}
+                    </p>
+                  </div>
 
                   {/* Post Footer */}
                   <div className="flex items-center justify-between text-xs text-white/60">
@@ -430,10 +536,27 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       )}
                     </div>
                   </div>
-                </div>
-              ))
+                  </div>
+                ))}
+                
+                {/* Load more indicator */}
+                {loadingMore && (
+                  <div className="text-white/60 text-sm text-center py-4">
+                    Loading more posts...
+                  </div>
+                )}
+                
+                {!hasMorePosts && posts.length > 0 && (
+                  <div className="text-white/40 text-xs text-center py-2">
+                    No more posts to load
+                  </div>
+                )}
+              </>
             )}
           </div>
+          
+          {/* Gradient fade-out overlay starting higher up */}
+          <div className="absolute bottom-0 left-0 right-0 h-3/5 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none"></div>
         </div>
       )}
 
