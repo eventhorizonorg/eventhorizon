@@ -23,6 +23,9 @@ interface NewMessage {
   country_code?: string
   has_photo?: boolean
   has_video?: boolean
+  views?: number
+  forwards?: number
+  detected_language?: string
 }
 
 interface Notification {
@@ -340,23 +343,23 @@ export default function Home() {
           resetIdleTimer()
           
           // Add idle rotation handlers
-          map.current.on('mousedown', () => {
+          map.current?.on('mousedown', () => {
             stopIdleRotation()
           })
           
-          map.current.on('dragstart', () => {
+          map.current?.on('dragstart', () => {
             stopIdleRotation()
           })
           
-          map.current.on('rotatestart', () => {
+          map.current?.on('rotatestart', () => {
             stopIdleRotation()
           })
           
-          map.current.on('pitchstart', () => {
+          map.current?.on('pitchstart', () => {
             stopIdleRotation()
           })
           
-          map.current.on('zoomstart', () => {
+          map.current?.on('zoomstart', () => {
             stopIdleRotation()
           })
         })
@@ -392,7 +395,20 @@ export default function Home() {
           schema: 'public',
           table: 'posts'
         }, (payload) => {
-          console.log('🆕 New post received:', payload.new)
+          // Filter out large embedding data from console log
+          const filteredNewPost = {
+            id: payload.new.id,
+            channel_name: payload.new.channel_name,
+            channel_username: payload.new.channel_username,
+            post_id: payload.new.post_id,
+            date: payload.new.date,
+            text: payload.new.text,
+            has_photo: payload.new.has_photo,
+            has_video: payload.new.has_video,
+            detected_language: payload.new.detected_language
+            // Excluding embedding, embedding_dimensions, embedding_model for smaller payload
+          }
+          console.log('🆕 New post received:', filteredNewPost)
           
           // Handle the new post asynchronously
           const handleNewPost = async () => {
@@ -868,6 +884,7 @@ export default function Home() {
         has_video: newPost.has_video,
         detected_language: newPost.detected_language
       },
+      timestamp: Date.now(),
       isVisible: true
     }
 

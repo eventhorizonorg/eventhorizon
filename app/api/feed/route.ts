@@ -16,10 +16,14 @@ export async function GET() {
 
     const supabase = supabaseServer()
     
-    // Get latest posts with location data
+    // Get latest posts from last 24 hours with location data
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    console.log('Feed API - Filtering posts from last 24 hours:', twentyFourHoursAgo)
+    
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
       .select('id, channel_name, channel_username, post_id, date, text, has_photo, has_video, detected_language')
+      .gte('date', twentyFourHoursAgo)
       .order('date', { ascending: false })
       .limit(100)
 
