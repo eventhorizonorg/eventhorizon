@@ -389,7 +389,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   }
 
   return (
-    <div className={`fixed top-4 right-4 z-50 bg-black/80 backdrop-blur-sm rounded-lg transition-all duration-300 ease-in-out ${
+    <div className={`fixed top-4 right-4 z-50 backdrop-blur-sm rounded-lg transition-all duration-300 ease-in-out ${
       isExpanded ? 'w-80' : 'w-auto'
     }`}>
       {/* Header - Always visible */}
@@ -427,17 +427,16 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
 
       {/* Posts List - Only visible when expanded */}
       {(isExpanded || isAnimating) && (
-        <div className="overflow-hidden transition-all duration-300 ease-in-out relative">
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out relative ${
+          isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
+        }`}>
           <div 
             ref={scrollContainerRef}
-            className={`px-4 pb-4 space-y-2 overflow-y-auto max-h-[40vh] pr-2 ${
-              isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
-            }`}
+            className="px-4 pt-3 pb-4 space-y-2 overflow-y-auto max-h-[40vh] pr-2 feed-fade-bottom-half"
             onScroll={handleScroll}
           >
             
             {/* Posts */}
-            <div className="text-white/60 text-xs font-medium uppercase tracking-wide mb-1">Latest Posts</div>
             
             {posts.length === 0 ? (
               <div className="text-white/60 text-sm text-center py-4">
@@ -450,22 +449,12 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                   <div
                     key={post.id}
                     className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-500 cursor-pointer mb-3 ${
-                      isAnimating ? 'animate-fadeOutDown' : 
-                      index === 0 && newPostCount > 0 ? 'animate-fadeInUp' : 'animate-fadeInUp'
-                    } ${
                       index === 0 && newPostCount > 0 
                         ? 'bg-red-500/10 animate-pulse' 
                         : 'hover:bg-white/10'
                     } ${
                       expandedPostId === post.id ? 'ring-2 ring-blue-500/50' : ''
-                    } ${
-                      isExpanding && expandedPostId === post.id ? 'animate-fadeOut' : ''
                     }`}
-                    style={{ 
-                      animationDelay: isAnimating 
-                        ? `${(posts.length - index - 1) * 25}ms` 
-                        : `${index * 50}ms`
-                    }}
                     onClick={() => handlePostClick(post)}
                   >
                   {/* Post Header */}
@@ -495,9 +484,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
 
                   {/* Post Content */}
                   <div className="mb-2">
-                    <p className={`text-white/90 text-xs leading-relaxed transition-all duration-300 ${
-                      expandedPostId === post.id ? 'animate-fadeIn' : ''
-                    }`}>
+                    <p className="text-white/90 text-xs leading-relaxed transition-all duration-300">
                       {expandedPostId === post.id ? post.text : truncateText(post.text)}
                     </p>
                   </div>
@@ -555,10 +542,9 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
             )}
           </div>
           
-          {/* Gradient fade-out overlay starting higher up */}
-          <div className="absolute bottom-0 left-0 right-0 h-3/5 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none"></div>
         </div>
       )}
+
 
     </div>
   )

@@ -248,3 +248,22 @@ body {
 .animate-slideDown {
   animation: slideDown 0.3s ease-out forwards;
 } 
+
+/* Feed: fade out bottom half of scrollable area to transparent */
+.feed-fade-bottom-half {
+  /* Small fade at top (0-10%), solid until 50%, strong fade to bottom */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0) 0%,
+    rgba(0,0,0,1) 10%,
+    rgba(0,0,0,1) 50%,
+    rgba(0,0,0,0) 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0) 0%,
+    rgba(0,0,0,1) 10%,
+    rgba(0,0,0,1) 50%,
+    rgba(0,0,0,0) 100%
+  );
+}
