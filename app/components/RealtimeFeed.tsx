@@ -354,15 +354,15 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: R
       {/* Posts List - Only visible when expanded */}
       {(isExpanded || isAnimating) && (
         <div className="overflow-hidden transition-all duration-300 ease-in-out">
-          <div className={`px-4 pb-4 space-y-3 overflow-y-auto max-h-[60vh] pr-2 ${
+          <div className={`px-4 pb-4 space-y-2 overflow-y-auto max-h-[60vh] pr-2 ${
             isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
           }`}>
             
             {/* Posts */}
-            <div className="text-white/60 text-xs font-medium uppercase tracking-wide mb-2">Latest Posts</div>
+            <div className="text-white/60 text-xs font-medium uppercase tracking-wide mb-1">Latest Posts</div>
             
             {/* Notifications as posts */}
-            {notifications.slice(0, 3).map((notification, index) => (
+            {notifications.length > 0 && notifications.slice(0, 3).map((notification, index) => (
               <div
                 key={notification.id}
                 className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-300 cursor-pointer ${
@@ -401,7 +401,9 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: R
                 )}
               </div>
             ))}
-            {posts.length === 0 ? (
+            
+            {/* Regular posts */}
+            {posts.length === 0 && notifications.length === 0 ? (
               <div className="text-white/60 text-sm text-center py-4">
                 No posts available
               </div>
@@ -411,7 +413,7 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: R
                   key={post.id}
                   className={`bg-white/5 backdrop-blur-sm rounded-lg p-3 transition-all duration-300 cursor-pointer ${
                     isAnimating ? 'animate-fadeOutDown' : 
-                    index === 0 && newPostCount > 0 ? 'animate-fadeInUp' : 'animate-slideDown'
+                    index === 0 && newPostCount > 0 ? 'animate-fadeInUp' : 'animate-fadeInUp'
                   } ${
                     index === 0 && newPostCount > 0 
                       ? 'bg-red-500/10 animate-pulse' 
@@ -420,9 +422,7 @@ export default function RealtimeFeed({ onZoomToLocation, notifications = [] }: R
                   style={{ 
                     animationDelay: isAnimating 
                       ? `${(posts.length - index - 1) * 25}ms` 
-                      : index === 0 && newPostCount > 0 
-                        ? '0ms' 
-                        : `${index * 100}ms`
+                      : `${index * 50}ms`
                   }}
                   onClick={() => {
                     if (post.latitude && post.longitude && onZoomToLocation) {
