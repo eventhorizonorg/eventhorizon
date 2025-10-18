@@ -58,7 +58,7 @@ interface FeedPost extends Post {
 }
 
 interface RealtimeFeedProps {
-  onZoomToLocation?: (latitude: number, longitude: number, locationName?: string, postId?: number) => void
+  onZoomToLocation?: (latitude: number, longitude: number, locationName?: string, postId?: number, locationType?: string | null) => void
 }
 
 export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
@@ -531,7 +531,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
             onClick={(e) => {
               e.stopPropagation()
               if (loc.latitude != null && loc.longitude != null && onZoomToLocation) {
-                onZoomToLocation(loc.latitude, loc.longitude, loc.name, post.id)
+                onZoomToLocation(loc.latitude, loc.longitude, loc.name, post.id, loc.location_type || null)
               }
             }}
             role="button"

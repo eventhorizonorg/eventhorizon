@@ -43,12 +43,21 @@ export default function Home() {
 
 
   // Function to zoom to coordinates and highlight the marker
-  const zoomToCoordinates = (latitude: number, longitude: number, locationName?: string, postId?: number) => {
+  const zoomToCoordinates = (latitude: number, longitude: number, locationName?: string, postId?: number, locationType?: string | null) => {
     if (!map.current) return
     
     console.log(`🗺️ Zooming to: ${locationName || 'Unknown'} (${latitude}, ${longitude})`)
     
-    // Check if this is a country-level location
+    // Determine zoom by type/name
+    if (locationType === 'continent') {
+      map.current.flyTo({ center: [longitude, latitude], zoom: 3, duration: 2000, essential: true })
+      return
+    }
+    if (locationType === 'region') {
+      map.current.flyTo({ center: [longitude, latitude], zoom: 5, duration: 2000, essential: true })
+      return
+    }
+    // Backward-compat: country detection by name
     if (locationName && isCountryOnlyLocation(locationName)) {
       console.log(`🌍 Country-level location detected: ${locationName} - showing country borders`)
       
