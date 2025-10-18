@@ -556,6 +556,18 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                     No more posts to load
                   </div>
                 )}
+                
+                {/* Invisible spacer posts to allow scrolling last post up to header */}
+                <div className="space-y-2">
+                  {/* Add 3-4 invisible spacer divs to create scrollable space */}
+                  {Array.from({ length: 4 }, (_, index) => (
+                    <div
+                      key={`spacer-${index}`}
+                      className="h-16 opacity-0 pointer-events-none"
+                      aria-hidden="true"
+                    />
+                  ))}
+                </div>
               </>
             )}
           </div>
