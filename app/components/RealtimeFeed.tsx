@@ -537,19 +537,6 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
             role="button"
           >
             <span className="truncate max-w-[120px]">{loc.name}</span>
-            {loc.wikipedia_title && (
-              <button
-                className="ml-1 text-white/60 hover:text-white/90"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setSelectedWikipediaTitle(loc.wikipedia_title!)
-                }}
-                aria-label={`Open Wikipedia for ${loc.name}`}
-                title={`Open Wikipedia for ${loc.name}`}
-              >
-                i
-              </button>
-            )}
           </div>
         ))}
       </div>
