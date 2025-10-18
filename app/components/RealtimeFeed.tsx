@@ -34,12 +34,27 @@ interface Post {
   detected_language: string
 }
 
+interface LocationItem {
+  name: string
+  latitude: number | null
+  longitude: number | null
+  location_type?: string | null
+  location_subtype?: string | null
+  type_confidence?: number | null
+  canonical_name?: string | null
+  wikipedia_title?: string | null
+  wikipedia_url?: string | null
+  priority?: number
+}
+
 interface FeedPost extends Post {
   location_name?: string
   country_code?: string
   latitude?: number | null
   longitude?: number | null
   entities?: PostEntities
+  primaryLocation?: LocationItem | null
+  locations?: LocationItem[]
 }
 
 interface RealtimeFeedProps {
@@ -114,7 +129,9 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           country_code: post.country_code,
           latitude: post.latitude,
           longitude: post.longitude,
-          entities: post.entities
+          entities: post.entities,
+          primaryLocation: post.primaryLocation || null,
+          locations: post.locations || []
         }))
         
         setPosts(prev => [...prev, ...newPosts])
@@ -218,7 +235,9 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                 country_code: post.country_code,
                 latitude: post.latitude,
                 longitude: post.longitude,
-                entities: post.entities
+                entities: post.entities,
+                primaryLocation: post.primaryLocation || null,
+                locations: post.locations || []
               })
             }
             return acc
@@ -493,6 +512,50 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     return text.substring(0, maxLength) + '...'
   }
 
+  // Render up to 3 location chips per post, ordered by priority (already ordered from API)
+  const renderLocationChips = (post: FeedPost) => {
+    const list: LocationItem[] = (post.locations && post.locations.length > 0)
+      ? post.locations
+      : (post.primaryLocation ? [post.primaryLocation] : [])
+
+    if (!list || list.length === 0) return null
+
+    const shown = list.slice(0, 3)
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {shown.map((loc, idx) => (
+          <div
+            key={`${post.id}-loc-${idx}-${loc.name}`}
+            className="flex items-center space-x-1 px-2 py-1 rounded-md border border-white/10 text-white/70 hover:text-white/90 hover:bg-white/5 text-[10px] transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (loc.latitude != null && loc.longitude != null && onZoomToLocation) {
+                onZoomToLocation(loc.latitude, loc.longitude, loc.name, post.id)
+              }
+            }}
+            role="button"
+          >
+            <span className="truncate max-w-[120px]">{loc.name}</span>
+            {loc.wikipedia_title && (
+              <button
+                className="ml-1 text-white/60 hover:text-white/90"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedWikipediaTitle(loc.wikipedia_title!)
+                }}
+                aria-label={`Open Wikipedia for ${loc.name}`}
+                title={`Open Wikipedia for ${loc.name}`}
+              >
+                i
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="fixed top-4 right-4 z-50 bg-black/80 backdrop-blur-sm rounded-lg">
@@ -663,6 +726,9 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       )}
                     </div>
                   </div>
+
+                  {/* Location Chips (prioritized) */}
+                  {renderLocationChips(post)}
                   </div>
                 ))}
                 

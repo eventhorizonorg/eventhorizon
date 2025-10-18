@@ -55,10 +55,12 @@ export async function GET(request: Request) {
         .from('post_locations')
         .select(`
           post_id,
-          locations_master!inner(id, name, latitude, longitude, canonical_name, wikipedia_title, wikipedia_url)
+          priority,
+          locations_master!inner(id, name, latitude, longitude, canonical_name, location_type, location_subtype, type_confidence, wikipedia_title, wikipedia_url)
         `)
         .in('post_id', postIds)
         .order('post_id', { ascending: false })
+        .order('priority', { ascending: true })
 
       if (!locationsError) {
         locationData = locationsData || []
@@ -109,16 +111,27 @@ export async function GET(request: Request) {
       }
     }
 
-    // Create a map of post_id to primary location
-    const locationMap = new Map()
-    locationData.forEach((loc: any) => {
-      if (!locationMap.has(loc.post_id)) {
-        locationMap.set(loc.post_id, {
-          latitude: loc.locations_master.latitude,
-          longitude: loc.locations_master.longitude,
-          location_name: loc.locations_master.name,
-          canonical_name: loc.locations_master.canonical_name
-        })
+    // Create maps for locations (ordered by priority) and a primary location
+    const locationsByPost: Map<number, any[]> = new Map()
+    const primaryLocationByPost: Map<number, any | null> = new Map()
+    locationData.forEach((row: any) => {
+      const entry = {
+        name: row.locations_master.name,
+        latitude: row.locations_master.latitude,
+        longitude: row.locations_master.longitude,
+        location_type: row.locations_master.location_type,
+        location_subtype: row.locations_master.location_subtype,
+        type_confidence: row.locations_master.type_confidence,
+        canonical_name: row.locations_master.canonical_name,
+        wikipedia_title: row.locations_master.wikipedia_title,
+        wikipedia_url: row.locations_master.wikipedia_url,
+        priority: row.priority
+      }
+      if (!locationsByPost.has(row.post_id)) {
+        locationsByPost.set(row.post_id, [entry])
+        primaryLocationByPost.set(row.post_id, entry)
+      } else {
+        locationsByPost.get(row.post_id)!.push(entry)
       }
     })
 
@@ -189,7 +202,8 @@ export async function GET(request: Request) {
 
     // Transform data to match expected format
     const transformedPosts = postsData?.map((post: any) => {
-      const location = locationMap.get(post.id)
+      const primaryLocation = primaryLocationByPost.get(post.id) || null
+      const locations = locationsByPost.get(post.id) || []
       const entities = entitiesMap.get(post.id) || { people: [], locations: [], policies: [], groups: [] }
       
       return {
@@ -199,14 +213,17 @@ export async function GET(request: Request) {
         date: post.date,
         channel: post.channel_name,
         channel_username: post.channel_username,
-        latitude: location?.latitude || null,
-        longitude: location?.longitude || null,
-        location_name: location?.location_name || null,
-        country_code: location?.canonical_name || null,
+        // legacy fields for back-compat filled from primaryLocation
+        latitude: primaryLocation?.latitude ?? null,
+        longitude: primaryLocation?.longitude ?? null,
+        location_name: primaryLocation?.name ?? null,
+        country_code: primaryLocation?.canonical_name ?? null,
         has_photo: post.has_photo,
         has_video: post.has_video,
         detected_language: post.detected_language,
-        entities: entities
+        entities: entities,
+        primaryLocation,
+        locations
       }
     }) || []
 
