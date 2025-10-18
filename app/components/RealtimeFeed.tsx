@@ -389,6 +389,18 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
       ...entities.groups.filter(e => e.wikipedia_title)
     ]
 
+    // Debug logging
+    if (entities.people.length > 0 || entities.locations.length > 0 || entities.policies.length > 0 || entities.groups.length > 0) {
+      console.log('📊 Post entities:', {
+        people: entities.people.length,
+        locations: entities.locations.length,
+        policies: entities.policies.length,
+        groups: entities.groups.length,
+        withWikipedia: allEntities.length,
+        sampleEntities: allEntities.slice(0, 3)
+      })
+    }
+
     if (allEntities.length === 0) return text
 
     // Sort entities by length (longest first) to avoid partial matches
