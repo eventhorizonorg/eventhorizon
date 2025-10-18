@@ -180,6 +180,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     } else {
       // Expanding - immediate
       setExpandedPostId(post.id)
+      // Close Wikipedia panel when clicking a new post
+      setSelectedWikipediaTitle(null)
       // Smoothly scroll the clicked post into view within the feed
       requestAnimationFrame(() => {
         const container = scrollContainerRef.current
