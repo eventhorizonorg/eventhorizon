@@ -113,7 +113,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           location_name: post.location_name,
           country_code: post.country_code,
           latitude: post.latitude,
-          longitude: post.longitude
+          longitude: post.longitude,
+          entities: post.entities
         }))
         
         setPosts(prev => [...prev, ...newPosts])
@@ -216,7 +217,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                 location_name: post.location_name,
                 country_code: post.country_code,
                 latitude: post.latitude,
-                longitude: post.longitude
+                longitude: post.longitude,
+                entities: post.entities
               })
             }
             return acc
@@ -304,8 +306,9 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       detected_language: newPost.detected_language,
                       location_name: newPost.location_name,
                       country_code: newPost.country_code,
-                      latitude: newPost.latitude,
-                      longitude: newPost.longitude
+                    latitude: newPost.latitude,
+                    longitude: newPost.longitude,
+                    entities: newPost.entities
                     }
                     
                     // Add to the beginning of the list and keep only 5
@@ -334,7 +337,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       location_name: newPost.location_name,
                       country_code: newPost.country_code,
                       latitude: newPost.latitude,
-                      longitude: newPost.longitude
+                      longitude: newPost.longitude,
+                      entities: newPost.entities
                     }
                     
                     setPosts(prev => [feedPost, ...prev.slice(0, 4)])
@@ -379,27 +383,35 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
 
   // Render text with clickable Wikipedia entities
   const renderTextWithEntities = (text: string, entities?: PostEntities) => {
-    if (!entities) return text
+    // Collect all entities with Wikipedia links (if any)
+    const allEntities: Array<{ name: string; wikipedia_title?: string }> = []
 
-    // Collect all entities with Wikipedia links
-    const allEntities: Array<{ name: string; wikipedia_title?: string }> = [
-      ...entities.people.filter(e => e.wikipedia_title),
-      ...entities.locations.filter(e => e.wikipedia_title),
-      ...entities.policies.filter(e => e.wikipedia_title),
-      ...entities.groups.filter(e => e.wikipedia_title)
-    ]
+    if (entities) {
+      allEntities.push(
+        ...entities.people.filter(e => e.wikipedia_title),
+        ...entities.locations.filter(e => e.wikipedia_title),
+        ...entities.policies.filter(e => e.wikipedia_title),
+        ...entities.groups.filter(e => e.wikipedia_title)
+      )
 
-    // Debug logging
-    if (entities.people.length > 0 || entities.locations.length > 0 || entities.policies.length > 0 || entities.groups.length > 0) {
-      console.log('📊 Post entities:', {
-        people: entities.people.length,
-        locations: entities.locations.length,
-        policies: entities.policies.length,
-        groups: entities.groups.length,
-        withWikipedia: allEntities.length,
-        sampleEntities: allEntities.slice(0, 3)
-      })
+      // Debug logging
+      if (entities.people.length > 0 || entities.locations.length > 0 || entities.policies.length > 0 || entities.groups.length > 0) {
+        console.log('📊 Post entities:', {
+          people: entities.people.length,
+          locations: entities.locations.length,
+          policies: entities.policies.length,
+          groups: entities.groups.length,
+          withWikipedia: allEntities.length,
+          sampleEntities: allEntities.slice(0, 3)
+        })
+      }
     }
+
+    // Always-available simple keywords (temporary: make specific names clickable regardless of DB)
+    const staticEntities: Array<{ name: string; wikipedia_title: string }> = [
+      { name: 'Trump', wikipedia_title: 'Donald_Trump' }
+    ]
+    allEntities.push(...staticEntities)
 
     if (allEntities.length === 0) return text
 
@@ -450,7 +462,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                   e.stopPropagation()
                   setSelectedWikipediaTitle(part.entity!.wikipedia_title)
                 }}
-                className="text-blue-400 hover:text-blue-300 cursor-pointer font-bold underline decoration-dotted transition-colors"
+                className="text-white hover:text-white cursor-pointer font-bold transition-colors"
                 title={`Click to view ${part.entity.name} on Wikipedia`}
               >
                 {part.text}
