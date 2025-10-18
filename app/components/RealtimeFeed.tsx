@@ -2,6 +2,25 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabaseClient } from '@/lib/supabase/client'
+import WikipediaPanel from './WikipediaPanel'
+
+interface WikipediaEntity {
+  name: string
+  mentioned_as?: string
+  canonical_name?: string
+  title?: string
+  role?: string
+  wikipedia_title?: string
+  wikipedia_url?: string
+  wikipedia_page_id?: number
+}
+
+interface PostEntities {
+  people: WikipediaEntity[]
+  locations: WikipediaEntity[]
+  policies: WikipediaEntity[]
+  groups: WikipediaEntity[]
+}
 
 interface Post {
   id: number
@@ -20,6 +39,7 @@ interface FeedPost extends Post {
   country_code?: string
   latitude?: number | null
   longitude?: number | null
+  entities?: PostEntities
 }
 
 interface RealtimeFeedProps {
@@ -40,6 +60,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   const postRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null)
   const [isExpanding, setIsExpanding] = useState(false)
+  const [selectedWikipediaTitle, setSelectedWikipediaTitle] = useState<string | null>(null)
 
 
   // Handle toggle with animation
@@ -356,6 +377,80 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     }
   }, [])
 
+  // Render text with clickable Wikipedia entities
+  const renderTextWithEntities = (text: string, entities?: PostEntities) => {
+    if (!entities) return text
+
+    // Collect all entities with Wikipedia links
+    const allEntities: Array<{ name: string; wikipedia_title?: string }> = [
+      ...entities.people.filter(e => e.wikipedia_title),
+      ...entities.locations.filter(e => e.wikipedia_title),
+      ...entities.policies.filter(e => e.wikipedia_title),
+      ...entities.groups.filter(e => e.wikipedia_title)
+    ]
+
+    if (allEntities.length === 0) return text
+
+    // Sort entities by length (longest first) to avoid partial matches
+    allEntities.sort((a, b) => b.name.length - a.name.length)
+
+    // Split text into parts and identify entity matches
+    const parts: Array<{ text: string; entity?: { name: string; wikipedia_title: string } }> = []
+    let remainingText = text
+    let currentIndex = 0
+
+    while (remainingText.length > 0) {
+      let foundMatch = false
+
+      for (const entity of allEntities) {
+        const entityIndex = remainingText.toLowerCase().indexOf(entity.name.toLowerCase())
+        
+        if (entityIndex === 0) {
+          // Found a match at the start
+          parts.push({
+            text: remainingText.substring(0, entity.name.length),
+            entity: { name: entity.name, wikipedia_title: entity.wikipedia_title! }
+          })
+          remainingText = remainingText.substring(entity.name.length)
+          currentIndex += entity.name.length
+          foundMatch = true
+          break
+        }
+      }
+
+      if (!foundMatch) {
+        // No match found, add one character as plain text
+        parts.push({ text: remainingText[0] })
+        remainingText = remainingText.substring(1)
+        currentIndex++
+      }
+    }
+
+    // Render the parts
+    return (
+      <span>
+        {parts.map((part, index) => {
+          if (part.entity) {
+            return (
+              <span
+                key={index}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedWikipediaTitle(part.entity!.wikipedia_title)
+                }}
+                className="text-blue-400 hover:text-blue-300 cursor-pointer underline decoration-dotted transition-colors"
+                title={`Click to view ${part.entity.name} on Wikipedia`}
+              >
+                {part.text}
+              </span>
+            )
+          }
+          return <span key={index}>{part.text}</span>
+        })}
+      </span>
+    )
+  }
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -503,7 +598,10 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                   {/* Post Content */}
                   <div className="mb-2">
                     <p className="text-white/90 text-xs leading-relaxed transition-all duration-300">
-                      {expandedPostId === post.id ? post.text : truncateText(post.text)}
+                      {expandedPostId === post.id 
+                        ? renderTextWithEntities(post.text, post.entities)
+                        : renderTextWithEntities(truncateText(post.text), post.entities)
+                      }
                     </p>
                   </div>
 
@@ -575,7 +673,11 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
         </div>
       )}
 
-
+      {/* Wikipedia Panel */}
+      <WikipediaPanel 
+        wikipediaTitle={selectedWikipediaTitle}
+        onClose={() => setSelectedWikipediaTitle(null)}
+      />
     </div>
   )
 }
