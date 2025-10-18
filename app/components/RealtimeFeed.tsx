@@ -481,10 +481,11 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                   e.stopPropagation()
                   setSelectedWikipediaTitle(part.entity!.wikipedia_title)
                 }}
-                className="text-white hover:text-white cursor-pointer font-bold transition-all duration-200 hover:scale-105"
+                className="text-white hover:text-white cursor-pointer font-bold relative group"
                 title={`Click to view ${part.entity.name} on Wikipedia`}
               >
                 {part.text}
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></span>
               </span>
             )
           }
