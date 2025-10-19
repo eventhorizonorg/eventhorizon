@@ -1,7 +1,27 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabaseClient } from '@/lib/supabase/client'
+import { stripTelegramFormatting } from '@/lib/text/sanitize'
+import WikipediaPanel from './WikipediaPanel'
+
+interface WikipediaEntity {
+  name: string
+  mentioned_as?: string
+  canonical_name?: string
+  title?: string
+  role?: string
+  wikipedia_title?: string
+  wikipedia_url?: string
+  wikipedia_page_id?: number
+}
+
+interface PostEntities {
+  people: WikipediaEntity[]
+  locations: WikipediaEntity[]
+  policies: WikipediaEntity[]
+  groups: WikipediaEntity[]
+}
 
 interface Post {
   id: number
@@ -15,18 +35,50 @@ interface Post {
   detected_language: string
 }
 
+interface LocationItem {
+  name: string
+  latitude: number | null
+  longitude: number | null
+  location_type?: string | null
+  location_subtype?: string | null
+  type_confidence?: number | null
+  canonical_name?: string | null
+  wikipedia_title?: string | null
+  wikipedia_url?: string | null
+  priority?: number
+}
+
+interface MediaItem {
+  id: number
+  media_type: 'photo' | 'video' | 'document' | 'audio'
+  public_url: string
+  filename?: string | null
+  width?: number | null
+  height?: number | null
+}
+
 interface FeedPost extends Post {
   location_name?: string
   country_code?: string
   latitude?: number | null
   longitude?: number | null
+  entities?: PostEntities
+  primaryLocation?: LocationItem | null
+  locations?: LocationItem[]
+  media?: MediaItem[]
+}
+
+interface ExternalPostSelection {
+  id: number
+  timestamp: number
 }
 
 interface RealtimeFeedProps {
-  onZoomToLocation?: (latitude: number, longitude: number, locationName?: string, postId?: number) => void
+  onZoomToLocation?: (latitude: number, longitude: number, locationName?: string, postId?: number, locationType?: string | null) => void
+  externalSelection?: ExternalPostSelection | null
 }
 
-export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
+export default function RealtimeFeed({ onZoomToLocation, externalSelection }: RealtimeFeedProps) {
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
@@ -40,7 +92,29 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   const postRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null)
   const [isExpanding, setIsExpanding] = useState(false)
+  const [selectedWikipediaTitle, setSelectedWikipediaTitle] = useState<string | null>(null)
+  const postsRef = useRef<FeedPost[]>([])
 
+
+  const mapApiPostToFeedPost = useCallback((post: any): FeedPost => ({
+    id: post.id,
+    channel_name: post.channel,
+    channel_username: post.channel_username,
+    post_id: post.post_id,
+    date: post.date,
+    text: stripTelegramFormatting(post.text),
+    has_photo: post.has_photo,
+    has_video: post.has_video,
+    detected_language: post.detected_language,
+    location_name: post.location_name,
+    country_code: post.country_code,
+    latitude: post.latitude,
+    longitude: post.longitude,
+    entities: post.entities,
+    primaryLocation: post.primaryLocation || null,
+    locations: post.locations || [],
+    media: Array.isArray(post.media) ? post.media : []
+  }), [])
 
   // Handle toggle with animation
   const handleToggle = () => {
@@ -58,6 +132,10 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
       setIsExpanded(true)
     }
   }
+
+  useEffect(() => {
+    postsRef.current = posts
+  }, [posts])
 
   // Load more posts for pagination
   const loadMorePosts = async () => {
@@ -79,23 +157,14 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
       const data = await response.json()
       
       if (data.posts && data.posts.length > 0) {
-        const newPosts = data.posts.map((post: any) => ({
-          id: post.id,
-          channel_name: post.channel,
-          channel_username: post.channel_username,
-          post_id: post.post_id,
-          date: post.date,
-          text: post.text,
-          has_photo: post.has_photo,
-          has_video: post.has_video,
-          detected_language: post.detected_language,
-          location_name: post.location_name,
-          country_code: post.country_code,
-          latitude: post.latitude,
-          longitude: post.longitude
-        }))
-        
-        setPosts(prev => [...prev, ...newPosts])
+        const newPosts: FeedPost[] = data.posts.map(mapApiPostToFeedPost)
+
+        setPosts(prev => {
+          const mergedMap = new Map<number, FeedPost>()
+          prev.forEach((post: FeedPost) => mergedMap.set(post.id, post))
+          newPosts.forEach((post: FeedPost) => mergedMap.set(post.id, post))
+          return Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        })
         setCurrentPage(prev => prev + 1)
         
         // Check if we have more posts based on API response
@@ -141,6 +210,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     } else {
       // Expanding - immediate
       setExpandedPostId(post.id)
+      // Close Wikipedia panel when clicking a new post
+      setSelectedWikipediaTitle(null)
       // Smoothly scroll the clicked post into view within the feed
       requestAnimationFrame(() => {
         const container = scrollContainerRef.current
@@ -163,7 +234,6 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
   useEffect(() => {
     const loadInitialPosts = async () => {
       try {
-        console.log('🔄 Loading initial posts for feed...')
         const response = await fetch('/api/feed', {
           cache: 'no-store',
           headers: {
@@ -175,28 +245,13 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
         }
         
         const data = await response.json()
-        console.log('📊 Feed API Response:', data)
         
         if (data.posts && Array.isArray(data.posts)) {
           // Get unique posts (since API returns posts with locations, we might have duplicates)
           const uniquePosts = data.posts.reduce((acc: FeedPost[], post: any) => {
             const existingPost = acc.find(p => p.id === post.id)
             if (!existingPost) {
-              acc.push({
-                id: post.id,
-                channel_name: post.channel,
-                channel_username: post.channel_username,
-                post_id: post.post_id,
-                date: post.date,
-                text: post.text,
-                has_photo: post.has_photo,
-                has_video: post.has_video,
-                detected_language: post.detected_language,
-                location_name: post.location_name,
-                country_code: post.country_code,
-                latitude: post.latitude,
-                longitude: post.longitude
-              })
+              acc.push(mapApiPostToFeedPost(post))
             }
             return acc
           }, [])
@@ -206,7 +261,6 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
             .sort((a: FeedPost, b: FeedPost) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 20)
           
-          console.log(`📍 Feed loaded ${latestPosts.length} posts`)
           setPosts(latestPosts)
         }
       } catch (error) {
@@ -221,7 +275,6 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
 
   // Set up real-time subscription
   useEffect(() => {
-    console.log('🔌 Setting up real-time subscription for feed...')
     
     try {
       const supabase = supabaseClient()
@@ -233,7 +286,6 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           schema: 'public',
           table: 'posts'
         }, async (payload) => {
-          console.log('🆕 New post received in feed:', payload.new)
           // Filter out large embedding data from console log
           const filteredPayload = {
             ...payload,
@@ -250,7 +302,6 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
               // Excluding embedding, embedding_dimensions, embedding_model for smaller payload
             }
           }
-          console.log('🔍 Filtered payload details:', JSON.stringify(filteredPayload, null, 2))
           
           // Fetch the complete post data with retry for location data
           const fetchPostWithRetry = async (retryCount = 0) => {
@@ -267,25 +318,10 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                 // Find the new post
                 const newPost = data.posts.find((post: any) => post.id === payload.new.id)
                 if (newPost) {
-                  console.log('📍 Adding new post to feed:', newPost)
                   
                   // Check if location data is available
                   if (newPost.latitude && newPost.longitude) {
-                    const feedPost: FeedPost = {
-                      id: newPost.id,
-                      channel_name: newPost.channel,
-                      channel_username: newPost.channel_username,
-                      post_id: newPost.post_id,
-                      date: newPost.date,
-                      text: newPost.text,
-                      has_photo: newPost.has_photo,
-                      has_video: newPost.has_video,
-                      detected_language: newPost.detected_language,
-                      location_name: newPost.location_name,
-                      country_code: newPost.country_code,
-                      latitude: newPost.latitude,
-                      longitude: newPost.longitude
-                    }
+                    const feedPost = mapApiPostToFeedPost(newPost)
                     
                     // Add to the beginning of the list and keep only 5
                     setPosts(prev => [feedPost, ...prev.slice(0, 4)])
@@ -300,21 +336,7 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                   } else {
                     // Add post without location data after max retries
                     console.log(`⚠️ Adding post ${payload.new.id} without location data after ${retryCount} retries`)
-                    const feedPost: FeedPost = {
-                      id: newPost.id,
-                      channel_name: newPost.channel,
-                      channel_username: newPost.channel_username,
-                      post_id: newPost.post_id,
-                      date: newPost.date,
-                      text: newPost.text,
-                      has_photo: newPost.has_photo,
-                      has_video: newPost.has_video,
-                      detected_language: newPost.detected_language,
-                      location_name: newPost.location_name,
-                      country_code: newPost.country_code,
-                      latitude: newPost.latitude,
-                      longitude: newPost.longitude
-                    }
+                    const feedPost = mapApiPostToFeedPost(newPost)
                     
                     setPosts(prev => [feedPost, ...prev.slice(0, 4)])
                     setNewPostCount(prev => prev + 1)
@@ -330,24 +352,20 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           fetchPostWithRetry()
         })
         .subscribe((status, err) => {
-          console.log('📡 Feed real-time subscription status:', status)
           if (err) {
             console.error('❌ Feed subscription error:', err)
           }
           if (status === 'SUBSCRIBED') {
             setRealtimeStatus('connected')
-            console.log('✅ Feed subscription successful - ready to receive real-time updates')
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             setRealtimeStatus('failed')
             console.error('❌ Feed subscription failed:', status)
           } else if (status === 'CLOSED') {
             setRealtimeStatus('disabled')
-            console.log('🔌 Feed subscription closed')
           }
         })
 
       return () => {
-        console.log('🔌 Cleaning up feed real-time subscription')
         subscription.unsubscribe()
       }
     } catch (error) {
@@ -355,6 +373,161 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
       setRealtimeStatus('failed')
     }
   }, [])
+
+  // Handle external selection requests (e.g., map marker clicks)
+  useEffect(() => {
+    if (!externalSelection) return
+
+    const focusPost = async () => {
+      const targetId = externalSelection.id
+      if (!targetId) return
+
+      setIsExpanded(true)
+
+      const ensurePostPresent = async () => {
+        const exists = postsRef.current.some(post => post.id === targetId)
+        if (exists) return
+
+        try {
+          const response = await fetch('/api/feed', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          })
+
+          if (!response.ok) return
+          const data = await response.json()
+          if (!data.posts || !Array.isArray(data.posts)) return
+
+          const fetchedPosts: FeedPost[] = data.posts.map(mapApiPostToFeedPost)
+          setPosts(prev => {
+            const mergedMap = new Map<number, FeedPost>()
+            prev.forEach((post: FeedPost) => mergedMap.set(post.id, post))
+            fetchedPosts.forEach((post: FeedPost) => mergedMap.set(post.id, post))
+            return Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          })
+        } catch (error) {
+          console.error('❌ Error refreshing posts for external selection:', error)
+        }
+      }
+
+      await ensurePostPresent()
+      setSelectedWikipediaTitle(null)
+      setExpandedPostId(targetId)
+
+      requestAnimationFrame(() => {
+        const container = scrollContainerRef.current
+        const target = postRefs.current.get(targetId)
+        if (container && target) {
+          const desiredTop = Math.max(target.offsetTop - 8, 0)
+          const maxTop = Math.max(container.scrollHeight - container.clientHeight, 0)
+          container.scrollTo({ top: Math.min(desiredTop, maxTop), behavior: 'smooth' })
+        }
+      })
+    }
+
+    focusPost()
+  }, [externalSelection, mapApiPostToFeedPost])
+
+  // Render text with clickable Wikipedia entities
+  const renderTextWithEntities = (text: string, entities?: PostEntities) => {
+    if (!entities) return text
+
+    type EntityMeta = {
+      label: string
+      wikipedia_title?: string
+      wikipedia_url?: string
+      type: 'person' | 'location' | 'policy' | 'group'
+      role?: string
+    }
+
+    const taggedEntities: EntityMeta[] = []
+
+    const addEntities = (items: WikipediaEntity[] = [], type: EntityMeta['type']) => {
+      for (const item of items) {
+        if (!item.name) continue
+        taggedEntities.push({
+          label: item.name,
+          wikipedia_title: item.wikipedia_title,
+          wikipedia_url: item.wikipedia_url,
+          role: item.role || item.title,
+          type
+        })
+      }
+    }
+
+    addEntities(entities.people, 'person')
+    addEntities(entities.locations, 'location')
+    addEntities(entities.policies, 'policy')
+    addEntities(entities.groups, 'group')
+
+    if (taggedEntities.length === 0) {
+      return text
+    }
+
+    taggedEntities.sort((a, b) => b.label.length - a.label.length)
+
+    const segments: Array<{ text: string; entity?: EntityMeta }> = []
+    let remaining = text
+
+    while (remaining.length > 0) {
+      let matched = false
+
+      for (const entity of taggedEntities) {
+        const idx = remaining.toLowerCase().indexOf(entity.label.toLowerCase())
+        if (idx === 0) {
+          segments.push({ text: remaining.slice(0, entity.label.length), entity })
+          remaining = remaining.slice(entity.label.length)
+          matched = true
+          break
+        }
+      }
+
+      if (!matched) {
+        segments.push({ text: remaining[0] })
+        remaining = remaining.slice(1)
+      }
+    }
+
+    return (
+      <span>
+        {segments.map((segment, index) => {
+          if (!segment.entity) {
+            return <span key={index}>{segment.text}</span>
+          }
+
+          const entity = segment.entity
+          const hasWikipedia = Boolean(entity.wikipedia_title || entity.wikipedia_url)
+          const tooltipParts = [entity.label]
+          if (entity.role) {
+            tooltipParts.push(entity.role)
+          }
+
+          const handleClick = (event: React.MouseEvent<HTMLSpanElement>) => {
+            event.stopPropagation()
+            if (hasWikipedia) {
+              setSelectedWikipediaTitle(entity.wikipedia_title || null)
+            }
+          }
+
+          return (
+            <span
+              key={index}
+              onClick={handleClick}
+              className={`relative group cursor-pointer font-semibold ${hasWikipedia ? 'text-blue-200 hover:text-blue-100' : 'text-white'}`}
+              title={tooltipParts.join(' • ')}
+            >
+              {segment.text}
+              {hasWikipedia && (
+                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-blue-200 transition-all duration-300 group-hover:w-full" />
+              )}
+            </span>
+          )
+        })}
+      </span>
+    )
+  }
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -369,9 +542,122 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     return date.toLocaleDateString()
   }
 
-  const truncateText = (text: string, maxLength: number = 120) => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + '...'
+const truncateText = (text: string, maxLength: number = 120) => {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength) + '...'
+}
+
+const renderMediaContent = (post: FeedPost, isExpanded: boolean) => {
+  if (!post.media || post.media.length === 0) return null
+
+  return (
+    <div className="space-y-2 mb-2">
+      {post.media.map((item) => {
+        if (!item || !item.public_url) return null
+        const preventToggle = isExpanded
+          ? (event: React.MouseEvent<HTMLElement>) => event.stopPropagation()
+          : undefined
+
+        if (item.media_type === 'photo') {
+          return (
+            <div
+              key={item.id}
+              className="overflow-hidden rounded-lg border border-white/10 bg-black/40"
+              onClick={preventToggle}
+            >
+              <img
+                src={item.public_url}
+                alt={item.filename || 'Telegram photo'}
+                loading="lazy"
+                className="h-auto w-full object-contain"
+              />
+            </div>
+          )
+        }
+
+        if (item.media_type === 'video') {
+          return (
+            <div
+              key={item.id}
+              className="overflow-hidden rounded-lg border border-white/10 bg-black/40"
+            >
+              <video
+                controls
+                src={item.public_url}
+                className="w-full"
+                preload="metadata"
+                onClick={preventToggle}
+                onDoubleClick={preventToggle}
+              />
+            </div>
+          )
+        }
+
+        if (item.media_type === 'audio') {
+          return (
+            <div
+              key={item.id}
+              className="rounded-lg border border-white/10 bg-black/40 p-3"
+              onClick={preventToggle}
+            >
+              <audio controls className="w-full">
+                <source src={item.public_url} />
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          )
+        }
+
+        // For document/audio or other media types provide a simple link fallback
+        return (
+          <a
+            key={item.id}
+            href={item.public_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-blue-300 hover:text-blue-200"
+            onClick={preventToggle}
+          >
+            <span className="truncate">
+              {item.filename || `${item.media_type} attachment`}
+            </span>
+            <span className="ml-2 text-white/60">↗</span>
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
+// Render up to 3 location chips per post, ordered by priority (already ordered from API)
+const renderLocationChips = (post: FeedPost) => {
+    const list: LocationItem[] = (post.locations && post.locations.length > 0)
+      ? post.locations
+      : (post.primaryLocation ? [post.primaryLocation] : [])
+
+    if (!list || list.length === 0) return null
+
+  const shown = list.slice(0, 3)
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {shown.map((loc, idx) => (
+          <div
+            key={`${post.id}-loc-${idx}-${loc.name}`}
+            className="flex items-center space-x-1 px-2 py-1 rounded-md border border-white/10 text-white/70 hover:text-white/90 hover:bg-white/5 text-[10px] transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (loc.latitude != null && loc.longitude != null && onZoomToLocation) {
+                onZoomToLocation(loc.latitude, loc.longitude, loc.name, post.id, loc.location_type || null)
+              }
+            }}
+            role="button"
+          >
+            <span className="truncate max-w-[120px]">{loc.name}</span>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   if (loading) {
@@ -503,9 +789,15 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                   {/* Post Content */}
                   <div className="mb-2">
                     <p className="text-white/90 text-xs leading-relaxed transition-all duration-300">
-                      {expandedPostId === post.id ? post.text : truncateText(post.text)}
+                      {expandedPostId === post.id 
+                        ? renderTextWithEntities(post.text, post.entities)
+                        : renderTextWithEntities(truncateText(post.text), post.entities)
+                      }
                     </p>
                   </div>
+
+                  {/* Media Attachments */}
+                  {renderMediaContent(post, expandedPostId === post.id)}
 
                   {/* Post Footer */}
                   <div className="flex items-center justify-between text-xs text-white/60">
@@ -541,6 +833,9 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       )}
                     </div>
                   </div>
+
+                  {/* Location Chips (prioritized) */}
+                  {renderLocationChips(post)}
                   </div>
                 ))}
                 
@@ -575,7 +870,11 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
         </div>
       )}
 
-
+      {/* Wikipedia Panel */}
+      <WikipediaPanel 
+        wikipediaTitle={selectedWikipediaTitle}
+        onClose={() => setSelectedWikipediaTitle(null)}
+      />
     </div>
   )
 }

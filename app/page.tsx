@@ -40,17 +40,25 @@ export default function Home() {
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
   const supabaseRef = useRef<any>(null)
   const subscriptionRef = useRef<any>(null)
+  const [mapSelectedPost, setMapSelectedPost] = useState<{ id: number; timestamp: number } | null>(null)
 
 
   // Function to zoom to coordinates and highlight the marker
-  const zoomToCoordinates = (latitude: number, longitude: number, locationName?: string, postId?: number) => {
+  const zoomToCoordinates = (latitude: number, longitude: number, locationName?: string, postId?: number, locationType?: string | null) => {
     if (!map.current) return
     
-    console.log(`🗺️ Zooming to: ${locationName || 'Unknown'} (${latitude}, ${longitude})`)
     
-    // Check if this is a country-level location
+    // Determine zoom by type/name
+    if (locationType === 'continent') {
+      map.current.flyTo({ center: [longitude, latitude], zoom: 3, duration: 2000, essential: true })
+      return
+    }
+    if (locationType === 'region') {
+      map.current.flyTo({ center: [longitude, latitude], zoom: 5, duration: 2000, essential: true })
+      return
+    }
+    // Backward-compat: country detection by name
     if (locationName && isCountryOnlyLocation(locationName)) {
-      console.log(`🌍 Country-level location detected: ${locationName} - showing country borders`)
       
       // Add country border visualization
       addCountryBorders(locationName)
@@ -115,7 +123,6 @@ export default function Home() {
         }
       })
 
-      console.log(`🗺️ Added country borders for: ${countryName}`)
     } catch (error) {
       console.error('❌ Error adding country borders:', error)
     }
@@ -139,7 +146,6 @@ export default function Home() {
         map.current.removeSource('country-borders')
       }
 
-      console.log('🗺️ Removed country borders')
     } catch (error) {
       console.error('❌ Error removing country borders:', error)
     }
@@ -208,6 +214,65 @@ export default function Home() {
 
 
 
+  // Configure label visibility based on zoom level
+  const configureLabelVisibility = () => {
+    if (!map.current) return
+
+    const currentZoom = map.current.getZoom()
+
+    // Define zoom thresholds
+    const CITY_ZOOM = 4      // Show city labels at zoom 4+
+    const PLACE_ZOOM = 6     // Show place/neighborhood labels at zoom 6+
+    const POI_ZOOM = 8       // Show points of interest at zoom 8+
+    const ROAD_ZOOM = 10     // Show road labels at zoom 10+
+
+    // Label layers to control
+    const labelLayers = [
+      // City labels
+      { pattern: 'settlement-subdivision-label', minZoom: CITY_ZOOM },
+      { pattern: 'settlement-minor-label', minZoom: CITY_ZOOM },
+
+      // Place labels (neighborhoods, districts)
+      { pattern: 'place-', minZoom: PLACE_ZOOM },
+      { pattern: 'poi-label', minZoom: POI_ZOOM },
+
+      // Road labels
+      { pattern: 'road-label', minZoom: ROAD_ZOOM },
+      { pattern: 'path-', minZoom: ROAD_ZOOM },
+
+      // Transit labels
+      { pattern: 'transit-', minZoom: POI_ZOOM },
+      { pattern: 'airport-label', minZoom: CITY_ZOOM },
+      { pattern: 'ferry-', minZoom: ROAD_ZOOM }
+    ]
+
+    // Get all layers and filter labels
+    const style = map.current.getStyle()
+    if (!style || !style.layers) return
+
+    style.layers.forEach(layer => {
+      if (layer.type === 'symbol' && layer.id.includes('label')) {
+        // Always show country labels
+        if (layer.id.includes('country')) {
+          map.current!.setLayoutProperty(layer.id, 'visibility', 'visible')
+          return
+        }
+
+        // Check if this layer matches any of our controlled patterns
+        const matchedRule = labelLayers.find(rule => layer.id.includes(rule.pattern))
+
+        if (matchedRule) {
+          const visibility = currentZoom >= matchedRule.minZoom ? 'visible' : 'none'
+          try {
+            map.current!.setLayoutProperty(layer.id, 'visibility', visibility)
+          } catch (e) {
+            // Layer might not support visibility property
+          }
+        }
+      }
+    })
+  }
+
   // Initialize map and load data
   useEffect(() => {
     if (!mapContainer.current) return
@@ -234,15 +299,22 @@ export default function Home() {
 
         map.current.on('load', async () => {
           await loadAndPlotMessages()
-          console.log('🎬 Starting pulse animation...')
           animatePulse()
-          
+
+          // Configure label visibility based on zoom level
+          configureLabelVisibility()
+
           // Remove any remaining Mapbox logos
           setTimeout(() => {
             const logos = document.querySelectorAll('.mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib');
             logos.forEach(logo => logo.remove())
           }, 100)
-          
+
+        })
+
+        // Update label visibility when zoom changes
+        map.current.on('zoom', () => {
+          configureLabelVisibility()
         })
 
         map.current.on('error', (e) => {
@@ -264,7 +336,6 @@ export default function Home() {
 
   // Real-time subscription for new posts
   useEffect(() => {
-    console.log('🔌 Setting up real-time subscription...')
     
     try {
       const supabase = supabaseClient()
@@ -289,25 +360,20 @@ export default function Home() {
             detected_language: payload.new.detected_language
             // Excluding embedding, embedding_dimensions, embedding_model for smaller payload
           }
-          console.log('🆕 New post received:', filteredNewPost)
           
           // Handle the new post asynchronously with retry for location data
           const handleNewPost = async (retryCount = 0) => {
             const newPost = payload.new
-            console.log('🔍 Fetching complete post data for:', newPost.id)
             try {
               const response = await fetch('/api/feed')
               const data = await response.json()
-              console.log('📊 API Response for new post:', data)
               
               if (data.posts && data.posts.length > 0) {
                 // Find the new post in the updated data
                 const latestPost = data.posts.find((post: any) => post.id === newPost.id)
-                console.log('🔍 Looking for post ID:', newPost.id, 'Found:', !!latestPost)
                 if (latestPost) {
                   // Check if location data is available
                   if (latestPost.latitude && latestPost.longitude) {
-                    console.log('📍 Adding new post to map with location:', latestPost)
                   addNewPostToMap(latestPost)
                   } else if (retryCount < 3) {
                     // Location data not ready yet, retry after a short delay
@@ -319,10 +385,8 @@ export default function Home() {
                     addNewPostToMap(latestPost)
                   }
                 } else {
-                  console.log('❌ New post not found in API response')
                 }
               } else {
-                console.log('❌ No posts in API response')
               }
             } catch (error) {
               console.error('❌ Error fetching new post data:', error)
@@ -332,7 +396,6 @@ export default function Home() {
           handleNewPost()
         })
         .subscribe((status) => {
-          console.log('📡 Real-time subscription status:', status)
           if (status === 'SUBSCRIBED') {
             setRealtimeStatus('connected')
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -343,7 +406,6 @@ export default function Home() {
         })
 
       return () => {
-        console.log('🔌 Cleaning up real-time subscription')
         subscription.unsubscribe()
       // Clean up country borders
       removeCountryBorders()
@@ -398,21 +460,18 @@ export default function Home() {
   // Load and plot posts
   const loadAndPlotMessages = async () => {
     try {
-      console.log('🔄 Loading posts...')
       const response = await fetch('/api/feed')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
       const responseData = await response.json()
-      console.log('📊 API Response:', responseData)
       
       if (!responseData.posts || !Array.isArray(responseData.posts)) {
         throw new Error('Invalid response format: posts array not found')
       }
       
       const messages = responseData.posts
-      console.log(`📍 Processing ${messages.length} posts`)
 
       // Filter posts that have location data (latitude and longitude) but exclude country-only locations
       const postsWithLocations = messages.filter((msg: any) => 
@@ -421,7 +480,6 @@ export default function Home() {
         !isCountryOnlyLocation(msg.location_name)
       )
       
-      console.log(`📍 Found ${postsWithLocations.length} posts with location data`)
       
       const geojson: FeatureCollection<Point> = {
         type: 'FeatureCollection',
@@ -450,7 +508,6 @@ export default function Home() {
         }))
       }
       
-      console.log(`🗺️ Created GeoJSON with ${geojson.features.length} features`)
       geojsonRef.current = geojson
       
       if (!map.current) {
@@ -458,13 +515,10 @@ export default function Home() {
         return
       }
       
-      console.log('🗺️ Map is ready, adding data source...')
       
       if (map.current.getSource('telegram-points')) {
-        console.log('🔄 Updating existing data source')
         ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(geojson)
       } else {
-        console.log('➕ Adding new data source and layers')
         map.current.addSource('telegram-points', {
           type: 'geojson',
           data: geojson
@@ -503,7 +557,6 @@ export default function Home() {
           }
         })
         
-        console.log('✅ Map layers added successfully')
         
         // Simple hover effect - just change cursor
         map.current.on('mouseenter', 'telegram-points-layer', () => {
@@ -556,7 +609,12 @@ export default function Home() {
           })
           
           // Show a brief notification
-          console.log(`🗺️ Zooming to ${locationName} at zoom level ${zoomLevel}`)
+
+          const rawId = props.id ?? props.post_id
+          const numericId = typeof rawId === 'string' ? parseInt(rawId, 10) : Number(rawId)
+          if (!Number.isNaN(numericId) && numericId > 0) {
+            setMapSelectedPost({ id: numericId, timestamp: Date.now() })
+          }
         })
         
         // Change cursor on hover over clickable points
@@ -580,13 +638,11 @@ export default function Home() {
 
   const animatePulse = () => {
     if (!map.current || !map.current.getSource('telegram-points')) {
-      console.log('⚠️ Animation stopped: Map or source not ready')
       return
     }
     
     const geojson = geojsonRef.current
     if (!geojson.features || geojson.features.length === 0) {
-      console.log('⚠️ Animation stopped: No features')
       return
     }
     
@@ -610,13 +666,11 @@ export default function Home() {
   // Add new post to map dynamically
   const addNewPostToMap = (newPost: any) => {
     if (!map.current || !map.current.getSource('telegram-points')) {
-      console.log('⚠️ Map not ready, skipping new post')
       return
     }
 
     // Skip country-only locations (don't show dots for them)
     if (isCountryOnlyLocation(newPost.location_name)) {
-      console.log('📍 Skipping country-only location:', newPost.location_name)
       return
     }
 
@@ -655,7 +709,6 @@ export default function Home() {
       // Update map source
       ;(map.current.getSource('telegram-points') as mapboxgl.GeoJSONSource).setData(geojson)
       
-      console.log('✅ New post added to map:', newPost.location_name)
     } catch (error) {
       console.error('❌ Error adding new post to map:', error)
     }
@@ -677,6 +730,7 @@ export default function Home() {
       {/* Real-time Feed Component - Top Right */}
       <RealtimeFeed 
         onZoomToLocation={zoomToCoordinates} 
+        externalSelection={mapSelectedPost}
       />
 
 
