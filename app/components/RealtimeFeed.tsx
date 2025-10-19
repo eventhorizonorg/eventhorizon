@@ -233,7 +233,6 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
   useEffect(() => {
     const loadInitialPosts = async () => {
       try {
-        console.log('🔄 Loading initial posts for feed...')
         const response = await fetch('/api/feed', {
           cache: 'no-store',
           headers: {
@@ -245,7 +244,6 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
         }
         
         const data = await response.json()
-        console.log('📊 Feed API Response:', data)
         
         if (data.posts && Array.isArray(data.posts)) {
           // Get unique posts (since API returns posts with locations, we might have duplicates)
@@ -262,7 +260,6 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
             .sort((a: FeedPost, b: FeedPost) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 20)
           
-          console.log(`📍 Feed loaded ${latestPosts.length} posts`)
           setPosts(latestPosts)
         }
       } catch (error) {
@@ -277,7 +274,6 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
 
   // Set up real-time subscription
   useEffect(() => {
-    console.log('🔌 Setting up real-time subscription for feed...')
     
     try {
       const supabase = supabaseClient()
@@ -289,7 +285,6 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
           schema: 'public',
           table: 'posts'
         }, async (payload) => {
-          console.log('🆕 New post received in feed:', payload.new)
           // Filter out large embedding data from console log
           const filteredPayload = {
             ...payload,
@@ -306,7 +301,6 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
               // Excluding embedding, embedding_dimensions, embedding_model for smaller payload
             }
           }
-          console.log('🔍 Filtered payload details:', JSON.stringify(filteredPayload, null, 2))
           
           // Fetch the complete post data with retry for location data
           const fetchPostWithRetry = async (retryCount = 0) => {
@@ -323,7 +317,6 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
                 // Find the new post
                 const newPost = data.posts.find((post: any) => post.id === payload.new.id)
                 if (newPost) {
-                  console.log('📍 Adding new post to feed:', newPost)
                   
                   // Check if location data is available
                   if (newPost.latitude && newPost.longitude) {
@@ -358,24 +351,20 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
           fetchPostWithRetry()
         })
         .subscribe((status, err) => {
-          console.log('📡 Feed real-time subscription status:', status)
           if (err) {
             console.error('❌ Feed subscription error:', err)
           }
           if (status === 'SUBSCRIBED') {
             setRealtimeStatus('connected')
-            console.log('✅ Feed subscription successful - ready to receive real-time updates')
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             setRealtimeStatus('failed')
             console.error('❌ Feed subscription failed:', status)
           } else if (status === 'CLOSED') {
             setRealtimeStatus('disabled')
-            console.log('🔌 Feed subscription closed')
           }
         })
 
       return () => {
-        console.log('🔌 Cleaning up feed real-time subscription')
         subscription.unsubscribe()
       }
     } catch (error) {
@@ -453,17 +442,7 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
         ...entities.groups.filter(e => e.wikipedia_title)
       )
 
-      // Debug logging
-      if (entities.people.length > 0 || entities.locations.length > 0 || entities.policies.length > 0 || entities.groups.length > 0) {
-        console.log('📊 Post entities:', {
-          people: entities.people.length,
-          locations: entities.locations.length,
-          policies: entities.policies.length,
-          groups: entities.groups.length,
-          withWikipedia: allEntities.length,
-          sampleEntities: allEntities.slice(0, 3)
-        })
-      }
+      // Entities loaded successfully
     }
 
     // Always-available simple keywords (temporary: make specific names clickable regardless of DB)
