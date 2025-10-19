@@ -432,84 +432,127 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
 
   // Render text with clickable Wikipedia entities
   const renderTextWithEntities = (text: string, entities?: PostEntities) => {
-    // Collect all entities with Wikipedia links (if any)
-    const allEntities: Array<{ name: string; wikipedia_title?: string }> = []
+    if (!entities) return text
 
-    if (entities) {
-      allEntities.push(
-        ...entities.people.filter(e => e.wikipedia_title),
-        ...entities.locations.filter(e => e.wikipedia_title),
-        ...entities.policies.filter(e => e.wikipedia_title),
-        ...entities.groups.filter(e => e.wikipedia_title)
-      )
-
-      // Entities loaded successfully
+    type EntityMeta = {
+      label: string
+      wikipedia_title?: string
+      wikipedia_url?: string
+      type: 'person' | 'location' | 'policy' | 'group'
+      role?: string
     }
 
-    // Always-available simple keywords (temporary: make specific names clickable regardless of DB)
-    const staticEntities: Array<{ name: string; wikipedia_title: string }> = [
-      { name: 'Trump', wikipedia_title: 'Donald_Trump' }
-    ]
-    allEntities.push(...staticEntities)
+    const taggedEntities: EntityMeta[] = []
 
-    if (allEntities.length === 0) return text
+    const addEntities = (items: WikipediaEntity[] = [], type: EntityMeta['type']) => {
+      for (const item of items) {
+        if (!item.name) continue
+        taggedEntities.push({
+          label: item.name,
+          wikipedia_title: item.wikipedia_title,
+          wikipedia_url: item.wikipedia_url,
+          role: item.role || item.title,
+          type
+        })
+      }
+    }
 
-    // Sort entities by length (longest first) to avoid partial matches
-    allEntities.sort((a, b) => b.name.length - a.name.length)
+    addEntities(entities.people, 'person')
+    addEntities(entities.locations, 'location')
+    addEntities(entities.policies, 'policy')
+    addEntities(entities.groups, 'group')
 
-    // Split text into parts and identify entity matches
-    const parts: Array<{ text: string; entity?: { name: string; wikipedia_title: string } }> = []
-    let remainingText = text
-    let currentIndex = 0
+    if (taggedEntities.length === 0) {
+      return text
+    }
 
-    while (remainingText.length > 0) {
-      let foundMatch = false
+    taggedEntities.sort((a, b) => b.label.length - a.label.length)
 
-      for (const entity of allEntities) {
-        const entityIndex = remainingText.toLowerCase().indexOf(entity.name.toLowerCase())
-        
-        if (entityIndex === 0) {
-          // Found a match at the start
-          parts.push({
-            text: remainingText.substring(0, entity.name.length),
-            entity: { name: entity.name, wikipedia_title: entity.wikipedia_title! }
-          })
-          remainingText = remainingText.substring(entity.name.length)
-          currentIndex += entity.name.length
-          foundMatch = true
+    const segments: Array<{ text: string; entity?: EntityMeta }> = []
+    let remaining = text
+
+    while (remaining.length > 0) {
+      let matched = false
+
+      for (const entity of taggedEntities) {
+        const idx = remaining.toLowerCase().indexOf(entity.label.toLowerCase())
+        if (idx === 0) {
+          segments.push({ text: remaining.slice(0, entity.label.length), entity })
+          remaining = remaining.slice(entity.label.length)
+          matched = true
           break
         }
       }
 
-      if (!foundMatch) {
-        // No match found, add one character as plain text
-        parts.push({ text: remainingText[0] })
-        remainingText = remainingText.substring(1)
-        currentIndex++
+      if (!matched) {
+        segments.push({ text: remaining[0] })
+        remaining = remaining.slice(1)
       }
     }
 
-    // Render the parts
     return (
       <span>
-        {parts.map((part, index) => {
-          if (part.entity) {
+        {segments.map((segment, index) => {
+          if (!segment.entity) {
+            return <span key={index}>{segment.text}</span>
+          }
+
+          const entity = segment.entity
+          const hasWikipedia = Boolean(entity.wikipedia_title || entity.wikipedia_url)
+          const tooltipParts = [entity.label]
+          if (entity.role) {
+            tooltipParts.push(entity.role)
+          }
+          if (entity.wikipedia_url) {
+            tooltipParts.push(entity.wikipedia_url)
+          }
+
+          const handleClick = (event: React.MouseEvent<HTMLSpanElement>) => {
+            event.stopPropagation()
+            if (hasWikipedia) {
+              setSelectedWikipediaTitle(entity.wikipedia_title || null)
+            }
+          }
+
+          const content = (
+            <span className="relative group cursor-pointer font-semibold text-blue-200 hover:text-blue-100">
+              {segment.text}
+              <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-blue-200 transition-all duration-300 group-hover:w-full" />
+            </span>
+          )
+
+          if (hasWikipedia && entity.wikipedia_url) {
             return (
-              <span
+              <a
                 key={index}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setSelectedWikipediaTitle(part.entity!.wikipedia_title)
+                href={entity.wikipedia_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleClick(event as any)
                 }}
-                className="text-white hover:text-white cursor-pointer font-bold relative group"
-                title={`Click to view ${part.entity.name} on Wikipedia`}
+                className="inline-flex items-center gap-1 text-blue-200 hover:text-blue-100"
+                title={tooltipParts.join(' • ')}
               >
-                {part.text}
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></span>
-              </span>
+                {content}
+              </a>
             )
           }
-          return <span key={index}>{part.text}</span>
+
+          return (
+            <span
+              key={index}
+              onClick={handleClick}
+              className={`relative group cursor-pointer font-semibold ${hasWikipedia ? 'text-blue-200 hover:text-blue-100' : 'text-white'}`}
+              title={tooltipParts.join(' • ')}
+            >
+              {segment.text}
+              {hasWikipedia && (
+                <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-blue-200 transition-all duration-300 group-hover:w-full" />
+              )}
+            </span>
+          )
         })}
       </span>
     )
