@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { stripTelegramFormatting } from '@/lib/text/sanitize'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
