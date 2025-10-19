@@ -30,7 +30,25 @@ export async function GET(request: Request) {
     
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
-      .select('id, channel_name, channel_username, post_id, date, text, has_photo, has_video, detected_language')
+      .select(`
+        id,
+        channel_name,
+        channel_username,
+        post_id,
+        date,
+        text,
+        has_photo,
+        has_video,
+        detected_language,
+        media (
+          id,
+          media_type,
+          public_url,
+          filename,
+          width,
+          height
+        )
+      `)
       .gte('date', twentyFourHoursAgo)
       .order('date', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -221,6 +239,7 @@ export async function GET(request: Request) {
         has_photo: post.has_photo,
         has_video: post.has_video,
         detected_language: post.detected_language,
+        media: Array.isArray(post.media) ? post.media : [],
         entities: entities,
         primaryLocation,
         locations

@@ -47,6 +47,15 @@ interface LocationItem {
   priority?: number
 }
 
+interface MediaItem {
+  id: number
+  media_type: 'photo' | 'video' | 'document' | 'audio'
+  public_url: string
+  filename?: string | null
+  width?: number | null
+  height?: number | null
+}
+
 interface FeedPost extends Post {
   location_name?: string
   country_code?: string
@@ -55,6 +64,7 @@ interface FeedPost extends Post {
   entities?: PostEntities
   primaryLocation?: LocationItem | null
   locations?: LocationItem[]
+  media?: MediaItem[]
 }
 
 interface RealtimeFeedProps {
@@ -131,7 +141,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
           longitude: post.longitude,
           entities: post.entities,
           primaryLocation: post.primaryLocation || null,
-          locations: post.locations || []
+          locations: post.locations || [],
+          media: Array.isArray(post.media) ? post.media : []
         }))
         
         setPosts(prev => [...prev, ...newPosts])
@@ -239,7 +250,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                 longitude: post.longitude,
                 entities: post.entities,
                 primaryLocation: post.primaryLocation || null,
-                locations: post.locations || []
+                locations: post.locations || [],
+                media: Array.isArray(post.media) ? post.media : []
               })
             }
             return acc
@@ -327,9 +339,10 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       detected_language: newPost.detected_language,
                       location_name: newPost.location_name,
                       country_code: newPost.country_code,
-                    latitude: newPost.latitude,
-                    longitude: newPost.longitude,
-                    entities: newPost.entities
+                      latitude: newPost.latitude,
+                      longitude: newPost.longitude,
+                      entities: newPost.entities,
+                      media: Array.isArray(newPost.media) ? newPost.media : []
                     }
                     
                     // Add to the beginning of the list and keep only 5
@@ -359,7 +372,8 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       country_code: newPost.country_code,
                       latitude: newPost.latitude,
                       longitude: newPost.longitude,
-                      entities: newPost.entities
+                      entities: newPost.entities,
+                      media: Array.isArray(newPost.media) ? newPost.media : []
                     }
                     
                     setPosts(prev => [feedPost, ...prev.slice(0, 4)])
@@ -510,20 +524,102 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
     return date.toLocaleDateString()
   }
 
-  const truncateText = (text: string, maxLength: number = 120) => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + '...'
-  }
+const truncateText = (text: string, maxLength: number = 120) => {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength) + '...'
+}
 
-  // Render up to 3 location chips per post, ordered by priority (already ordered from API)
-  const renderLocationChips = (post: FeedPost) => {
+const renderMediaContent = (post: FeedPost, isExpanded: boolean) => {
+  if (!post.media || post.media.length === 0) return null
+
+  return (
+    <div className="space-y-2 mb-2">
+      {post.media.map((item) => {
+        if (!item || !item.public_url) return null
+        const preventToggle = isExpanded
+          ? (event: React.MouseEvent<HTMLElement>) => event.stopPropagation()
+          : undefined
+
+        if (item.media_type === 'photo') {
+          return (
+            <div
+              key={item.id}
+              className="overflow-hidden rounded-lg border border-white/10 bg-black/40"
+              onClick={preventToggle}
+            >
+              <img
+                src={item.public_url}
+                alt={item.filename || 'Telegram photo'}
+                loading="lazy"
+                className="h-auto w-full object-contain"
+              />
+            </div>
+          )
+        }
+
+        if (item.media_type === 'video') {
+          return (
+            <div
+              key={item.id}
+              className="overflow-hidden rounded-lg border border-white/10 bg-black/40"
+            >
+              <video
+                controls
+                src={item.public_url}
+                className="w-full"
+                preload="metadata"
+                onClick={preventToggle}
+                onDoubleClick={preventToggle}
+              />
+            </div>
+          )
+        }
+
+        if (item.media_type === 'audio') {
+          return (
+            <div
+              key={item.id}
+              className="rounded-lg border border-white/10 bg-black/40 p-3"
+              onClick={preventToggle}
+            >
+              <audio controls className="w-full">
+                <source src={item.public_url} />
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          )
+        }
+
+        // For document/audio or other media types provide a simple link fallback
+        return (
+          <a
+            key={item.id}
+            href={item.public_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-blue-300 hover:text-blue-200"
+            onClick={preventToggle}
+          >
+            <span className="truncate">
+              {item.filename || `${item.media_type} attachment`}
+            </span>
+            <span className="ml-2 text-white/60">↗</span>
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
+// Render up to 3 location chips per post, ordered by priority (already ordered from API)
+const renderLocationChips = (post: FeedPost) => {
     const list: LocationItem[] = (post.locations && post.locations.length > 0)
       ? post.locations
       : (post.primaryLocation ? [post.primaryLocation] : [])
 
     if (!list || list.length === 0) return null
 
-    const shown = list.slice(0, 3)
+  const shown = list.slice(0, 3)
 
     return (
       <div className="flex flex-wrap gap-1 mt-2">
@@ -681,6 +777,9 @@ export default function RealtimeFeed({ onZoomToLocation }: RealtimeFeedProps) {
                       }
                     </p>
                   </div>
+
+                  {/* Media Attachments */}
+                  {renderMediaContent(post, expandedPostId === post.id)}
 
                   {/* Post Footer */}
                   <div className="flex items-center justify-between text-xs text-white/60">
