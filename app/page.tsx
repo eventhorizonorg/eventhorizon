@@ -40,6 +40,7 @@ export default function Home() {
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'failed' | 'disabled'>('connecting')
   const supabaseRef = useRef<any>(null)
   const subscriptionRef = useRef<any>(null)
+  const [mapSelectedPost, setMapSelectedPost] = useState<{ id: number; timestamp: number } | null>(null)
 
 
   // Function to zoom to coordinates and highlight the marker
@@ -566,6 +567,12 @@ export default function Home() {
           
           // Show a brief notification
           console.log(`🗺️ Zooming to ${locationName} at zoom level ${zoomLevel}`)
+
+          const rawId = props.id ?? props.post_id
+          const numericId = typeof rawId === 'string' ? parseInt(rawId, 10) : Number(rawId)
+          if (!Number.isNaN(numericId) && numericId > 0) {
+            setMapSelectedPost({ id: numericId, timestamp: Date.now() })
+          }
         })
         
         // Change cursor on hover over clickable points
@@ -686,6 +693,7 @@ export default function Home() {
       {/* Real-time Feed Component - Top Right */}
       <RealtimeFeed 
         onZoomToLocation={zoomToCoordinates} 
+        externalSelection={mapSelectedPost}
       />
 
 
