@@ -157,12 +157,12 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
       const data = await response.json()
       
       if (data.posts && data.posts.length > 0) {
-        const newPosts = data.posts.map(mapApiPostToFeedPost)
-        
+        const newPosts: FeedPost[] = data.posts.map(mapApiPostToFeedPost)
+
         setPosts(prev => {
           const mergedMap = new Map<number, FeedPost>()
-          prev.forEach(post => mergedMap.set(post.id, post))
-          newPosts.forEach(post => mergedMap.set(post.id, post))
+          prev.forEach((post: FeedPost) => mergedMap.set(post.id, post))
+          newPosts.forEach((post: FeedPost) => mergedMap.set(post.id, post))
           return Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         })
         setCurrentPage(prev => prev + 1)
@@ -400,11 +400,11 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
           const data = await response.json()
           if (!data.posts || !Array.isArray(data.posts)) return
 
-          const fetchedPosts = data.posts.map(mapApiPostToFeedPost)
+          const fetchedPosts: FeedPost[] = data.posts.map(mapApiPostToFeedPost)
           setPosts(prev => {
             const mergedMap = new Map<number, FeedPost>()
-            prev.forEach(post => mergedMap.set(post.id, post))
-            fetchedPosts.forEach(post => mergedMap.set(post.id, post))
+            prev.forEach((post: FeedPost) => mergedMap.set(post.id, post))
+            fetchedPosts.forEach((post: FeedPost) => mergedMap.set(post.id, post))
             return Array.from(mergedMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
           })
         } catch (error) {
