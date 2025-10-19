@@ -503,41 +503,12 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
           if (entity.role) {
             tooltipParts.push(entity.role)
           }
-          if (entity.wikipedia_url) {
-            tooltipParts.push(entity.wikipedia_url)
-          }
 
           const handleClick = (event: React.MouseEvent<HTMLSpanElement>) => {
             event.stopPropagation()
             if (hasWikipedia) {
               setSelectedWikipediaTitle(entity.wikipedia_title || null)
             }
-          }
-
-          const content = (
-            <span className="relative group cursor-pointer font-semibold text-blue-200 hover:text-blue-100">
-              {segment.text}
-              <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-blue-200 transition-all duration-300 group-hover:w-full" />
-            </span>
-          )
-
-          if (hasWikipedia && entity.wikipedia_url) {
-            return (
-              <a
-                key={index}
-                href={entity.wikipedia_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleClick(event as any)
-                }}
-                className="inline-flex items-center gap-1 text-blue-200 hover:text-blue-100"
-                title={tooltipParts.join(' • ')}
-              >
-                {content}
-              </a>
-            )
           }
 
           return (
