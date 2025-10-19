@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { stripTelegramFormatting } from '@/lib/text/sanitize'
 
 export async function GET(request: Request) {
   try {
@@ -227,7 +228,7 @@ export async function GET(request: Request) {
       return {
         id: post.id,
         post_id: post.post_id,
-        text: post.text,
+        text: stripTelegramFormatting(post.text),
         date: post.date,
         channel: post.channel_name,
         channel_username: post.channel_username,

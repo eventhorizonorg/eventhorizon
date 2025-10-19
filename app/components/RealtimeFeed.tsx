@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabaseClient } from '@/lib/supabase/client'
+import { stripTelegramFormatting } from '@/lib/text/sanitize'
 import WikipediaPanel from './WikipediaPanel'
 
 interface WikipediaEntity {
@@ -101,7 +102,7 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
     channel_username: post.channel_username,
     post_id: post.post_id,
     date: post.date,
-    text: post.text,
+    text: stripTelegramFormatting(post.text),
     has_photo: post.has_photo,
     has_video: post.has_video,
     detected_language: post.detected_language,

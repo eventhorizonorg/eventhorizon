@@ -44,6 +44,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!lib/
+lib/*
 lib64/
 parts/
 sdist/
@@ -223,3 +225,4 @@ temp/
 ehthumbs.db
 Thumbs.db.env.local
 !lib/supabase/
+!lib/text/
