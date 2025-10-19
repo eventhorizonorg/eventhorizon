@@ -57,6 +57,16 @@ export default function Home() {
       map.current.flyTo({ center: [longitude, latitude], zoom: 5, duration: 2000, essential: true })
       return
     }
+    if (locationName && isMaritimeLocation(locationName)) {
+      removeCountryBorders()
+      map.current.flyTo({
+        center: [longitude, latitude],
+        zoom: 5,
+        duration: 2000,
+        essential: true
+      })
+      return
+    }
     // Backward-compat: country detection by name
     if (locationName && isCountryOnlyLocation(locationName)) {
       
@@ -416,8 +426,8 @@ export default function Home() {
   }, [])
 
   // Helper function to check if location is country-level only
-  const isCountryOnlyLocation = (locationName: string) => {
-    if (!locationName) return false
+const isCountryOnlyLocation = (locationName: string) => {
+  if (!locationName) return false
     
     // List of common country names that should not show dots
     const countryOnlyNames = [
@@ -589,6 +599,10 @@ export default function Home() {
               locationName.includes(',')) {
             zoomLevel = 9 // City level zoom (more zoomed out)
           }
+          else if (isMaritimeLocation(locationName)) {
+            zoomLevel = 5
+            removeCountryBorders()
+          }
           // Check if it's a country-level location
           else if (isCountryOnlyLocation(locationName)) {
             zoomLevel = 3 // Country level zoom (more zoomed out)
@@ -736,4 +750,11 @@ export default function Home() {
 
     </div>
   )
-} 
+}
+
+const isMaritimeLocation = (locationName: string) => {
+  if (!locationName) return false
+  const maritimeKeywords = [' sea', ' ocean', ' gulf', ' bay', 'strait', 'straits', 'channel', 'lagoon', 'lake']
+  const normalized = locationName.toLowerCase()
+  return maritimeKeywords.some(keyword => normalized.includes(keyword))
+}
