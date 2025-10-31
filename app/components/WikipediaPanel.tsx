@@ -81,12 +81,11 @@ export default function WikipediaPanel({ wikipediaTitle, onClose }: WikipediaPan
   }
 
   const panel = (
-    <div className={`fixed left-4 top-4 z-50 w-96 max-h-[90vh] overflow-hidden transform transition-all duration-200 ${panelEntering ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
-      <div className="bg-white/5 backdrop-blur-sm rounded-lg shadow-xl border border-white/10">
+    <div className={`fixed left-0 top-0 z-50 w-96 h-screen overflow-hidden transform transition-all duration-200 flex flex-col ${panelEntering ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
+      <div className="bg-white/5 backdrop-blur-sm shadow-xl border border-white/10 flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
           <div className="flex items-center space-x-2">
-            <span className="text-white/80 font-semibold text-xs uppercase tracking-wider">Source: Wikipedia</span>
           </div>
           <button
             onClick={onClose}
@@ -100,7 +99,7 @@ export default function WikipediaPanel({ wikipediaTitle, onClose }: WikipediaPan
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div className="overflow-y-auto flex-1">
           <FadingContent transitionKey={`${wikipediaTitle}-${loading ? 'loading' : 'ready'}`}>
             {loading && (
               <div className="p-8 text-center">
