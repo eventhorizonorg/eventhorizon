@@ -1,0 +1,44 @@
+# Gitleaks configuration for Event Horizon
+# This file configures what secrets to scan for
+
+title = "Event Horizon Secret Scanning"
+
+[extend]
+# Use default rules
+useDefault = true
+
+[allowlist]
+description = "Allowlist for Event Horizon"
+paths = [
+  '''\.env\.example$''',
+  '''docs/.*''',
+  '''\.github/.*''',
+  '''node_modules/.*''',
+  '''\.next/.*''',
+  '''coffee\.png$''',
+]
+
+commits = [
+  # Allow example patterns in documentation
+  '''your_stripe_secret_key_here''',
+  '''your_mapbox_token_here''',
+  '''your_supabase_url_here''',
+]
+
+regexes = [
+  # Allow example patterns
+  '''sk_live_\.\.\.''',
+  '''sk_test_\.\.\.''',
+  '''pk_live_\.\.\.''',
+  '''pk_test_\.\.\.''',
+]
+
+[allowlist.stops]
+# Don't flag these as secrets even if they match patterns
+stops = [
+  '''your_stripe_secret_key_here''',
+  '''your_mapbox_token_here''',
+  '''example''',
+  '''placeholder''',
+]
+
