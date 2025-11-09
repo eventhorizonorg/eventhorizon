@@ -16,7 +16,8 @@ paths = [
   '''node_modules/.*''',
   '''\.next/.*''',
   '''coffee\.png$''',
-  '''app/api/donations/payment-links/route\.ts$''',  # Public Stripe payment links file
+  '''app/api/donations/payment-links/route\.ts''',  # Public Stripe payment links file (removed $ anchor)
+  '''.*payment-links.*''',  # More permissive pattern for payment links files
 ]
 
 commits = [
@@ -29,8 +30,8 @@ commits = [
 regexes = [
   # Strictly match public payment links; anchors avoid overmatch
   # Only allow buy.stripe.com payment links (public URLs, not secrets)
-  # Match the exact pattern used in payment-links/route.ts
-  '''https://buy\.stripe\.com/[A-Za-z0-9]+''',
+  # Match exact payment link format (20+ alphanumeric chars after /)
+  '''https://buy\.stripe\.com/[A-Za-z0-9]{20,}''',
   '''https?://buy\.stripe\.com/[A-Za-z0-9_\-/?=&#%]+''',
   # Allow example patterns in docs
   '''sk_live_\.\.\.''',

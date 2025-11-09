@@ -22,7 +22,6 @@ This repository uses automated security scanning to protect against:
 ### 2. Dependency Scanning
 - **npm audit**: Checks for known vulnerabilities in dependencies
 - **Dependabot**: Automated dependency updates with security focus
-- **Dependency Review**: Blocks high+ severity vulnerabilities and GPL licenses
 - Weekly scans for new vulnerabilities
 
 ### 3. Code Security Analysis
