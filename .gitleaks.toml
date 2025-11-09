@@ -22,6 +22,12 @@ paths = [
   '''payment-links''',          # File containing public payment links
 ]
 
+# Allowlist specific commits containing Mapbox public tokens (client-side, not secrets)
+commits = [
+  '''4fcc7485f3dc88e7dbed0f673c3a596049f1e0e2''',  # index.html, telegram_visualization.html with Mapbox token
+  '''42376cf3b03bc967ce8922739891678072c5354a''',  # main.js with Mapbox token
+]
+
 # Precise regex for public Stripe payment links only
 # Format: https://buy.stripe.com/{variable-length alphanumeric ID}
 # Stripe payment link IDs are typically 20-30 characters
