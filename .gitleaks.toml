@@ -8,32 +8,32 @@ title = "Event Horizon Secret Scanning"
 useDefault = true
 
 [allowlist]
-description = "Allow public Stripe payment links and known false positives"
+description = "Allow public Stripe payment links and build artifacts only"
 
 # CRITICAL: Do NOT exclude .github/ - workflows/configs are common leak sources
+# Only exclude build artifacts and known safe files
 paths = [
-  '''\.env\.example$''',
-  '''node_modules/.*''',
-  '''\.next/.*''',
-  '''coffee\.png$''',
-  # Allow payment links file - public URLs only
-  '''payment-links''',
+  '''\.env\.example$''',        # Example env file with placeholders
+  '''node_modules/.*''',        # Dependencies (performance)
+  '''\.next/.*''',              # Build artifacts (performance)
+  '''coffee\.png$''',           # Image file
+  '''payment-links''',          # File containing public payment links
 ]
 
-# Remove - allowlist.commits requires commit SHAs, not example strings
-# commits = []
-
+# Precise regex for public Stripe payment links only
+# Format: https://buy.stripe.com/{23-char alphanumeric ID}
 regexes = [
-  # Single precise pattern for public Stripe payment links
-  # buy.stripe.com links are public URLs, not secrets
-  # Match standard format: 10+ alphanumeric chars
-  '''^https://buy\.stripe\.com/[A-Za-z0-9]{10,}$''',
+  '''^https://buy\.stripe\.com/[A-Za-z0-9]{23}$''',
 ]
 
-# Stopwords for known false positives (case-insensitive)
+# Stopwords for known false positives in file content
 [allowlist.stops]
 stops = [
+  '''your_stripe_secret_key_here''',
+  '''your_mapbox_token_here''',
+  '''your_supabase_url_here''',
   '''example''',
   '''placeholder''',
-  '''your_.*_here''',
+  '''sk_test_''',  # Allow test mode references in docs
+  '''pk_test_''',
 ]

@@ -28,12 +28,21 @@ jobs:
         run: npm ci
 
       - name: Run npm audit
-        continue-on-error: true
+        id: npm-audit
+        # Fail on critical vulnerabilities for main/develop, warn on feature branches
+        continue-on-error: ${{ !contains(fromJSON('["main", "develop"]'), github.ref_name) }}
         run: |
-          npm audit --audit-level=moderate --json > npm-audit.json || true
-          npm audit --audit-level=moderate || true
+          npm audit --audit-level=critical --json > npm-audit.json || true
+          if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "develop" ]; then
+            echo "Running strict audit for protected branch..."
+            npm audit --audit-level=critical
+          else
+            echo "Running moderate audit for feature branch..."
+            npm audit --audit-level=moderate || true
+          fi
 
       - name: Upload audit results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: npm-audit-report
