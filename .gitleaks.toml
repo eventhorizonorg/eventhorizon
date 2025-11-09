@@ -20,6 +20,7 @@ paths = [
   '''\.next/.*''',              # Build artifacts (performance)
   '''coffee\.png$''',           # Image file
   '''payment-links''',          # File containing public payment links
+  '''README\.md$''',            # Contains example Gitleaks output in documentation
 ]
 
 # Allowlist specific commits containing Mapbox public tokens (client-side, not secrets)
