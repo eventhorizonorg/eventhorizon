@@ -1,0 +1,50 @@
+# npm audit workflow - Official npm audit documentation: https://docs.npmjs.com/cli/v10/commands/npm-audit
+name: NPM Security Audit
+
+on:
+  push:
+    branches: [ main, develop, stripe ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 3 * * 1' # Run weekly on Mondays at 3 AM UTC
+  workflow_dispatch:
+
+jobs:
+  npm-audit:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        id: npm-audit
+        # Fail on critical vulnerabilities for main/develop, warn on feature branches
+        continue-on-error: ${{ !contains(fromJSON('["main", "develop"]'), github.ref_name) }}
+        run: |
+          npm audit --audit-level=critical --json > npm-audit.json || true
+          if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "develop" ]; then
+            echo "Running strict audit for protected branch..."
+            npm audit --audit-level=critical
+          else
+            echo "Running moderate audit for feature branch..."
+            npm audit --audit-level=moderate || true
+          fi
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit.json
+          retention-days: 30

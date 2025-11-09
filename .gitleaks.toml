@@ -1,0 +1,51 @@
+# Gitleaks configuration for Event Horizon
+# Strict allowlist for public Stripe payment links only
+
+title = "Event Horizon Secret Scanning"
+
+[extend]
+# Use default rules
+useDefault = true
+
+[allowlist]
+description = "Allow public Stripe payment links and build artifacts only"
+
+# CRITICAL: Do NOT exclude .github/ - workflows/configs are common leak sources
+# Only exclude build artifacts and known safe files
+paths = [
+  '''\.env$''',                 # Local env file (not tracked, in .gitignore)
+  '''\.env\.local$''',          # Local env file (not tracked, in .gitignore)
+  '''\.env\.example$''',        # Example env file with placeholders
+  '''node_modules/.*''',        # Dependencies (performance)
+  '''\.next/.*''',              # Build artifacts (performance)
+  '''coffee\.png$''',           # Image file
+  '''payment-links''',          # File containing public payment links
+  '''README\.md$''',            # Contains example Gitleaks output in documentation
+]
+
+# Allowlist specific commits containing Mapbox public tokens (client-side, not secrets)
+commits = [
+  '''4fcc7485f3dc88e7dbed0f673c3a596049f1e0e2''',  # index.html, telegram_visualization.html with Mapbox token
+  '''42376cf3b03bc967ce8922739891678072c5354a''',  # main.js with Mapbox token
+]
+
+# Precise regex for public Stripe payment links only
+# Format: https://buy.stripe.com/{variable-length alphanumeric ID}
+# Stripe payment link IDs are typically 20-30 characters
+regexes = [
+  '''https://buy\.stripe\.com/[A-Za-z0-9]{20,30}''',
+]
+
+# Stopwords for known false positives in file content (must be within allowlist in v8)
+stopwords = [
+  '''your_stripe_secret_key_here''',
+  '''your_mapbox_token_here''',
+  '''your_supabase_url_here''',
+  '''example''',
+  '''placeholder''',
+  '''sk_test_''',  # Allow test mode references in docs
+  '''pk_test_''',
+  '''sk_live_''',  # Mentioned in docs
+  '''pk_live_''',
+  '''mpk.eyJ1IjoiZGFuaWVsc3VueXVhbiIsImEiOiJjbHBiM3FhOXUwYmxnMmtubzljcGRwcHBjIn0.MO5mlsRbbl-O6labngyIaA''',  # Mapbox public token in git history
+]

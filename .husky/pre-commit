@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run Gitleaks on staged files to prevent secrets from being committed
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "🔒 Running Gitleaks secret scan on staged files..."
+  gitleaks protect --staged --verbose --config-path .gitleaks.toml
+else
+  echo "⚠️  Gitleaks not installed. Install with: brew install gitleaks"
+  echo "   Skipping pre-commit secret scan..."
+fi
+

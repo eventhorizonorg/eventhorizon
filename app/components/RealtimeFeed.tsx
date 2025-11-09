@@ -662,8 +662,8 @@ const renderLocationChips = (post: FeedPost) => {
 
   if (loading) {
     return (
-      <div className="fixed top-4 right-4 z-50 bg-black/80 backdrop-blur-sm rounded-lg">
-        <div className="flex items-center justify-between p-4 cursor-pointer" onClick={handleToggle}>
+      <div className="fixed top-0 right-0 h-screen z-50 bg-black/80 backdrop-blur-sm flex flex-col">
+        <div className="flex items-center justify-between p-4 cursor-pointer flex-shrink-0" onClick={handleToggle}>
           <div className={`flex items-center space-x-2 transition-all duration-300 ease-in-out ${
             isExpanded ? 'transform -translate-x-2' : 'transform translate-x-0'
           }`}>
@@ -686,12 +686,12 @@ const renderLocationChips = (post: FeedPost) => {
   }
 
   return (
-    <div className={`fixed top-4 right-4 z-50 backdrop-blur-sm rounded-lg transition-all duration-300 ease-in-out ${
-      isExpanded ? 'w-80' : 'w-auto'
+    <div className={`fixed top-0 right-0 z-50 backdrop-blur-sm transition-all duration-300 ease-in-out flex flex-col ${
+      isExpanded ? 'w-80 h-screen' : 'w-auto h-auto'
     }`}>
       {/* Header - Always visible */}
       <div 
-        className="flex items-center justify-between p-4 cursor-pointer"
+        className="flex items-center justify-between p-4 cursor-pointer flex-shrink-0"
         onClick={handleToggle}
       >
         <div className={`flex items-center space-x-2 transition-all duration-300 ease-in-out ${
@@ -724,12 +724,12 @@ const renderLocationChips = (post: FeedPost) => {
 
       {/* Posts List - Only visible when expanded */}
       {(isExpanded || isAnimating) && (
-        <div className={`overflow-hidden transition-all duration-300 ease-in-out relative mt-2 ${
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out relative flex-1 flex flex-col ${
           isAnimating ? 'animate-fadeOut' : 'animate-fadeIn'
         }`}>
           <div 
             ref={scrollContainerRef}
-            className="px-4 pt-3 pb-4 space-y-2 overflow-y-auto max-h-[40vh] pr-2 feed-fade-bottom-half"
+            className="px-4 pt-3 pb-4 space-y-2 overflow-y-auto flex-1 pr-2 feed-fade-bottom-half"
             onScroll={handleScroll}
           >
             
@@ -841,8 +841,12 @@ const renderLocationChips = (post: FeedPost) => {
                 
                 {/* Load more indicator */}
                 {loadingMore && (
-                  <div className="text-white/60 text-sm text-center py-4">
-                    Loading more posts...
+                  <div className="text-white/60 text-sm text-center py-4 flex items-center justify-center">
+                    <span className="inline-flex space-x-1">
+                      <span className="w-1 h-1 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1.4s' }}></span>
+                      <span className="w-1 h-1 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1.4s' }}></span>
+                      <span className="w-1 h-1 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1.4s' }}></span>
+                    </span>
                   </div>
                 )}
                 
