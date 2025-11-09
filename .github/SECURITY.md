@@ -96,6 +96,8 @@ All security workflows run automatically:
 
 Workflow results are visible in the Actions tab and Security tab (for SARIF reports).
 
+All checks must pass before merging to protected branches.
+
 ## Local Setup
 
 ### Pre-commit Hook
