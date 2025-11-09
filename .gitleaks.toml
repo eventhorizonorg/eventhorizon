@@ -8,46 +8,32 @@ title = "Event Horizon Secret Scanning"
 useDefault = true
 
 [allowlist]
-description = "Allow public Stripe payment links only"
+description = "Allow public Stripe payment links and known false positives"
+
+# CRITICAL: Do NOT exclude .github/ - workflows/configs are common leak sources
 paths = [
   '''\.env\.example$''',
-  '''docs/.*''',
-  '''\.github/.*''',
   '''node_modules/.*''',
   '''\.next/.*''',
   '''coffee\.png$''',
-  # Allow payment links file - use simple pattern that matches file path
+  # Allow payment links file - public URLs only
   '''payment-links''',
 ]
 
-commits = [
-  # Allow example patterns in documentation
-  '''your_stripe_secret_key_here''',
-  '''your_mapbox_token_here''',
-  '''your_supabase_url_here''',
-]
+# Remove - allowlist.commits requires commit SHAs, not example strings
+# commits = []
 
 regexes = [
-  # Strictly match public payment links; anchors avoid overmatch
-  # Only allow buy.stripe.com payment links (public URLs, not secrets)
-  # Match exact payment link format (20+ alphanumeric chars after /)
-  '''https://buy\.stripe\.com/[A-Za-z0-9]{20,}''',
-  '''https://buy\.stripe\.com/[A-Za-z0-9]+''',
-  '''https?://buy\.stripe\.com/[A-Za-z0-9_\-/?=&#%]+''',
-  # Allow example patterns in docs
-  '''sk_live_\.\.\.''',
-  '''sk_test_\.\.\.''',
-  '''pk_live_\.\.\.''',
-  '''pk_test_\.\.\.''',
+  # Single precise pattern for public Stripe payment links
+  # buy.stripe.com links are public URLs, not secrets
+  # Match standard format: 10+ alphanumeric chars
+  '''^https://buy\.stripe\.com/[A-Za-z0-9]{10,}$''',
 ]
 
-# Do NOT add stripe.com to stops - we want to catch real secrets like sk_live_...
-
-# Stops list for commit messages (not file content)
+# Stopwords for known false positives (case-insensitive)
 [allowlist.stops]
 stops = [
-  '''your_stripe_secret_key_here''',
-  '''your_mapbox_token_here''',
   '''example''',
   '''placeholder''',
+  '''your_.*_here''',
 ]
