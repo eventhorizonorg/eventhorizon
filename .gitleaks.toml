@@ -16,6 +16,7 @@ paths = [
   '''node_modules/.*''',
   '''\.next/.*''',
   '''coffee\.png$''',
+  '''app/api/donations/payment-links/route\.ts$''',  # Public Stripe payment links
 ]
 
 commits = [
@@ -31,6 +32,8 @@ regexes = [
   '''sk_test_\.\.\.''',
   '''pk_live_\.\.\.''',
   '''pk_test_\.\.\.''',
+  # Allow public Stripe payment link URLs
+  '''buy\.stripe\.com/[a-zA-Z0-9]+''',
 ]
 
 [allowlist.stops]
