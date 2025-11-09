@@ -15,12 +15,14 @@ This repository uses automated security scanning to protect against:
 
 ### 1. Secret Scanning
 - **Gitleaks**: Scans for hardcoded secrets, API keys, and credentials
-- **TruffleHog**: Additional layer of secret detection
+- **Pre-commit hooks**: Local validation before commits
+- **GitHub Push Protection**: Enabled via Advanced Security (if available)
 - Runs on every push, PR, and daily via schedule
 
 ### 2. Dependency Scanning
 - **npm audit**: Checks for known vulnerabilities in dependencies
 - **Dependabot**: Automated dependency updates with security focus
+- **Dependency Review**: Blocks high+ severity vulnerabilities and GPL licenses
 - Weekly scans for new vulnerabilities
 
 ### 3. Code Security Analysis
@@ -50,6 +52,7 @@ We will respond within 48 hours and work with you to address the issue.
 2. **Review PRs carefully**: Check for accidental secret exposure
 3. **Keep dependencies updated**: Run `npm audit` regularly
 4. **Use secure defaults**: Follow security guidelines in code reviews
+5. **Run pre-commit hooks**: Install Gitleaks locally to catch secrets before committing
 
 ### Environment Variables
 
@@ -65,6 +68,14 @@ All sensitive data must be stored in environment variables:
 - Session tokens
 - Database credentials
 
+### License Policy
+
+**Allowed Licenses:**
+- MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, LGPL-3.0-or-later
+
+**Denied Licenses:**
+- GPL-2.0-only, GPL-3.0-only, AGPL-3.0-only (copyleft licenses)
+
 ## Security Checklist
 
 Before merging PRs:
@@ -73,6 +84,8 @@ Before merging PRs:
 - [ ] Dependencies are up to date
 - [ ] Security scans pass
 - [ ] Code review completed
+- [ ] No high-severity vulnerabilities
+- [ ] No denied licenses in dependencies
 
 ## Automated Security
 
@@ -82,5 +95,19 @@ All security workflows run automatically:
 - Daily/weekly scheduled scans
 - Manual trigger via workflow_dispatch
 
-Workflow results are visible in the Actions tab.
+Workflow results are visible in the Actions tab and Security tab (for SARIF reports).
 
+## Local Setup
+
+### Pre-commit Hook
+
+Install Gitleaks locally to catch secrets before committing:
+
+```bash
+# macOS
+brew install gitleaks
+
+# Or download from: https://github.com/gitleaks/gitleaks/releases
+```
+
+The pre-commit hook will automatically run Gitleaks on staged files.
