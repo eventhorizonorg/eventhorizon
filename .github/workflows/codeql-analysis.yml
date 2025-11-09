@@ -22,7 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript', 'typescript' ]
+        language: [ 'javascript' ]
+        # Note: CodeQL treats TypeScript as JavaScript, so only 'javascript' is needed
 
     steps:
     - name: Checkout repository
@@ -38,14 +39,12 @@ jobs:
         # queries: security-extended,security-and-quality
 
     - name: Setup Node.js
-      if: matrix.language == 'javascript' || matrix.language == 'typescript'
       uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
 
     - name: Install dependencies
-      if: matrix.language == 'javascript' || matrix.language == 'typescript'
       run: npm ci
 
     - name: Autobuild
