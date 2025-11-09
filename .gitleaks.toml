@@ -29,6 +29,8 @@ commits = [
 regexes = [
   # Strictly match public payment links; anchors avoid overmatch
   # Only allow buy.stripe.com payment links (public URLs, not secrets)
+  # Match the exact pattern used in payment-links/route.ts
+  '''https://buy\.stripe\.com/[A-Za-z0-9]+''',
   '''https?://buy\.stripe\.com/[A-Za-z0-9_\-/?=&#%]+''',
   # Allow example patterns in docs
   '''sk_live_\.\.\.''',

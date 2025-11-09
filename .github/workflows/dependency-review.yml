@@ -25,3 +25,5 @@ jobs:
           # Deny copyleft licenses
           deny-licenses: GPL-2.0-only,GPL-3.0-only,AGPL-3.0-only
           comment-summary-in-pr: always
+          # Only review dependencies added/changed in this PR
+          deny-ghsas: ""

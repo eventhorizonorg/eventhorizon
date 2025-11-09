@@ -686,8 +686,8 @@ const renderLocationChips = (post: FeedPost) => {
   }
 
   return (
-    <div className={`fixed top-0 right-0 h-screen z-50 backdrop-blur-sm transition-all duration-300 ease-in-out flex flex-col ${
-      isExpanded ? 'w-80' : 'w-auto'
+    <div className={`fixed top-0 right-0 z-50 backdrop-blur-sm transition-all duration-300 ease-in-out flex flex-col ${
+      isExpanded ? 'w-80 h-screen' : 'w-auto h-auto'
     }`}>
       {/* Header - Always visible */}
       <div 
