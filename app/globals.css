@@ -281,3 +281,89 @@ body {
 .animate-slide-into {
   animation: slideIntoPlace 0.2s ease-out;
 }
+
+/* Live orb glow (used for timeline live dot) */
+@keyframes liveOrbPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 6px rgba(255,255,255,0.9),
+      0 0 12px rgba(255,255,255,0.6),
+      0 0 20px rgba(255,255,255,0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 10px rgba(255,255,255,1),
+      0 0 18px rgba(255,255,255,0.8),
+      0 0 28px rgba(255,255,255,0.5);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes liveOrbRing {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0.9;
+  }
+  80% {
+    transform: translate(-50%, -50%) scale(2.0);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.live-orb {
+  position: absolute;
+  border-radius: 9999px;
+  animation: liveOrbPulse 1.8s ease-in-out infinite;
+}
+
+.live-orb::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,255,255,0.5);
+  animation: liveOrbRing 1.8s ease-out infinite;
+}
+
+/* Donation modal animation */
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Coffee icon shake animation on hover */
+/* Shake for 1.5s, break for 0.5s, repeat */
+@keyframes shakeHover {
+  0%, 100% {
+    transform: translateX(0) rotate(12deg);
+  }
+  /* Shake phase (0% to 75% = 1.5s of 2s total) */
+  1%, 3%, 5%, 7%, 9%, 11%, 13%, 15%, 17%, 19%, 21%, 23%, 25%, 27%, 29%, 31%, 33%, 35%, 37%, 39%, 41%, 43%, 45%, 47%, 49%, 51%, 53%, 55%, 57%, 59%, 61%, 63%, 65%, 67%, 69%, 71%, 73% {
+    transform: translateX(-1.5px) rotate(10deg);
+  }
+  2%, 4%, 6%, 8%, 10%, 12%, 14%, 16%, 18%, 20%, 22%, 24%, 26%, 28%, 30%, 32%, 34%, 36%, 38%, 40%, 42%, 44%, 46%, 48%, 50%, 52%, 54%, 56%, 58%, 60%, 62%, 64%, 66%, 68%, 70%, 72%, 74% {
+    transform: translateX(1.5px) rotate(14deg);
+  }
+  /* Break phase (75% to 100% = 0.5s of 2s total) */
+  75%, 100% {
+    transform: translateX(0) rotate(12deg);
+  }
+}
+
+.animate-shake-hover {
+  animation: shakeHover 10s ease-in-out infinite;
+}

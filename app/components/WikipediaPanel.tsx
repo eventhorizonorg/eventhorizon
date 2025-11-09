@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import Timeline from './Timeline'
 
 interface WikipediaData {
   title: string
@@ -17,10 +18,17 @@ interface WikipediaData {
 
 interface WikipediaPanelProps {
   wikipediaTitle: string | null
+  locationName?: string
+  personName?: string
   onClose: () => void
 }
 
-export default function WikipediaPanel({ wikipediaTitle, onClose }: WikipediaPanelProps) {
+export default function WikipediaPanel({ 
+  wikipediaTitle, 
+  locationName,
+  personName,
+  onClose 
+}: WikipediaPanelProps) {
   const [data, setData] = useState<WikipediaData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,78 +107,100 @@ export default function WikipediaPanel({ wikipediaTitle, onClose }: WikipediaPan
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto flex-1">
-          <FadingContent transitionKey={`${wikipediaTitle}-${loading ? 'loading' : 'ready'}`}>
-            {loading && (
-              <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-                <p className="text-white/60 text-sm mt-4">Loading...</p>
-              </div>
-            )}
-
-            {error && (
-              <div className="p-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-                  <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {data && !loading && !error && (
-              <div className="p-6 space-y-4">
-              {/* Image */}
-              {(data.thumbnail || data.originalImage) && (
-                <div className="rounded-lg overflow-hidden bg-white/5">
-                  <img
-                    src={data.thumbnail || data.originalImage || ''}
-                    alt={data.title}
-                    className="w-full h-48 object-cover"
-                  />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Wikipedia Section - Top 25% */}
+          <div className="flex-shrink-0" style={{ height: '25%', maxHeight: '25vh' }}>
+            <FadingContent transitionKey={`${wikipediaTitle}-${loading ? 'loading' : 'ready'}`}>
+              {loading && (
+                <div className="p-4 text-center h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto"></div>
                 </div>
               )}
 
-              {/* Title */}
-              <div>
-                <h2 className="text-white text-xs font-semibold mb-1">{(data.displayTitle || data.title).replace(/<[^>]*>/g, '')}</h2>
-                {data.description && (
-                  <p className="text-white/60 text-[11px] italic">{data.description}</p>
-                )}
-              </div>
-
-              {/* Extract/Summary */}
-              {data.extract && (
-                <div className="text-white/90 text-xs leading-relaxed">
-                  {data.extract}
+              {error && (
+                <div className="p-4">
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                    <p className="text-red-400 text-[11px]">{error}</p>
+                  </div>
                 </div>
               )}
 
-              {/* Coordinates (if available) */}
-              {data.coordinates && (
-                <div className="flex items-center space-x-2 text-white/60 text-xs">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12,2C8.13,2 5,5.13 5,9C5,14.25 12,22 12,22S19,14.25 19,9C19,5.13 15.87,2 12,2M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5Z"/>
-                  </svg>
-                  <span>{data.coordinates.lat.toFixed(4)}, {data.coordinates.lon.toFixed(4)}</span>
+              {data && !loading && !error && (
+                <div className="h-full p-4 flex gap-3 overflow-hidden">
+                  {/* Image - Left side, compact */}
+                  {(data.thumbnail || data.originalImage) && (
+                    <div className="flex-shrink-0 rounded-lg overflow-hidden bg-white/5" style={{ width: '40%' }}>
+                      <img
+                        src={data.thumbnail || data.originalImage || ''}
+                        alt={data.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {/* Text Content - Right side */}
+                  <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                    {/* Title */}
+                    <div className="mb-1.5">
+                      <h2 className="text-white text-[10px] font-medium leading-tight">
+                        {(data.displayTitle || data.title).replace(/<[^>]*>/g, '')}
+                      </h2>
+                      {data.description && (
+                        <p className="text-white/60 text-[9px] italic mt-0.5 leading-tight">{data.description}</p>
+                      )}
+                    </div>
+
+                    {/* Extract/Summary - Truncated and scrollable */}
+                    {data.extract && (
+                      <div className="flex-1 overflow-y-auto">
+                        <p className="text-white/90 text-[10px] leading-relaxed line-clamp-4">
+                          {data.extract.length > 200 ? data.extract.substring(0, 200) + '...' : data.extract}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Footer - Coordinates and link */}
+                    <div className="flex-shrink-0 mt-2 pt-2 border-t border-white/10">
+                      <div className="flex items-center justify-between">
+                        {data.coordinates && (
+                          <div className="flex items-center space-x-1.5 text-white/60 text-[9px]">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12,2C8.13,2 5,5.13 5,9C5,14.25 12,22 12,22S19,14.25 19,9C19,5.13 15.87,2 12,2M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5Z"/>
+                            </svg>
+                            <span>{data.coordinates.lat.toFixed(4)}, {data.coordinates.lon.toFixed(4)}</span>
+                          </div>
+                        )}
+                        <a
+                          href={data.pageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center space-x-1 text-white hover:text-white/80 text-[9px] transition-colors"
+                        >
+                          <span>Read more</span>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
+            </FadingContent>
+          </div>
 
-                {/* Link to full article */}
-                <div className="pt-4 border-t border-white/10">
-                  <a
-                    href={data.pageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center space-x-2 text-white hover:text-white/80 text-xs transition-colors"
-                  >
-                    <span>Read more on Wikipedia</span>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </div>
-              </div>
+          {/* Divider */}
+          <div className="flex-shrink-0 border-t border-white/10"></div>
+
+          {/* Timeline Section - Bottom 75% */}
+          <div className="flex-1 overflow-hidden" style={{ height: '75%' }}>
+            {(locationName || personName) && (
+              <Timeline 
+                locationName={locationName}
+                personName={personName}
+              />
             )}
-          </FadingContent>
+          </div>
         </div>
       </div>
     </div>

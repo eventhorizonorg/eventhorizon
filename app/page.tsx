@@ -8,6 +8,7 @@ import React from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { supabaseClient } from '@/lib/supabase/client'
 import RealtimeFeed from './components/RealtimeFeed'
+import DonationButton from './components/DonationButton'
 
 // Types for real-time notifications
 interface NewMessage {
@@ -733,6 +734,8 @@ export default function Home() {
         externalSelection={mapSelectedPost}
       />
 
+      {/* Donation Button - Bottom Right */}
+      <DonationButton />
 
     </div>
   )
