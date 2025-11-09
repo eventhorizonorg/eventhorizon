@@ -39,4 +39,5 @@ stops = [
   '''placeholder''',
   '''sk_test_''',  # Allow test mode references in docs
   '''pk_test_''',
+  '''mpk.eyJ1IjoiZGFuaWVsc3VueXVhbiIsImEiOiJjbHBiM3FhOXUwYmxnMmtubzljcGRwcHBjIn0.MO5mlsRbbl-O6labngyIaA''',  # Mapbox public token in git history
 ]
