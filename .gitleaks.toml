@@ -13,6 +13,8 @@ description = "Allow public Stripe payment links and build artifacts only"
 # CRITICAL: Do NOT exclude .github/ - workflows/configs are common leak sources
 # Only exclude build artifacts and known safe files
 paths = [
+  '''\.env$''',                 # Local env file (not tracked, in .gitignore)
+  '''\.env\.local$''',          # Local env file (not tracked, in .gitignore)
   '''\.env\.example$''',        # Example env file with placeholders
   '''node_modules/.*''',        # Dependencies (performance)
   '''\.next/.*''',              # Build artifacts (performance)
