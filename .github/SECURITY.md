@@ -25,9 +25,10 @@ This repository uses automated security scanning to protect against:
 - Weekly scans for new vulnerabilities
 
 ### 3. Code Security Analysis
-- **CodeQL**: Static analysis for security vulnerabilities
+- **GitHub Advanced Security CodeQL**: Built-in static analysis for security vulnerabilities
 - **Environment Variable Checks**: Ensures secrets are not hardcoded
 - Validates proper use of environment variables
+- Results appear in the Security tab with inline PR annotations
 
 ## Reporting a Vulnerability
 

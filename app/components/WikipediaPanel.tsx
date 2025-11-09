@@ -4,6 +4,16 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import Timeline from './Timeline'
 
+/**
+ * Safely strip HTML tags from a string using DOM parsing
+ * This prevents XSS vulnerabilities from incomplete or malformed HTML
+ */
+const stripHtml = (html: string): string => {
+  if (typeof window === 'undefined') return html
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return doc.body.textContent || ''
+}
+
 interface WikipediaData {
   title: string
   displayTitle: string
@@ -143,7 +153,7 @@ export default function WikipediaPanel({
                     {/* Title */}
                     <div className="mb-1.5">
                       <h2 className="text-white text-[10px] font-medium leading-tight">
-                        {(data.displayTitle || data.title).replace(/<[^>]*>/g, '')}
+                        {stripHtml(data.displayTitle || data.title)}
                       </h2>
                       {data.description && (
                         <p className="text-white/60 text-[9px] italic mt-0.5 leading-tight">{data.description}</p>
