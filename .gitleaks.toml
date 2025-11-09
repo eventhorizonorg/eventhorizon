@@ -16,7 +16,8 @@ paths = [
   '''node_modules/.*''',
   '''\.next/.*''',
   '''coffee\.png$''',
-  '''app/api/donations/payment-links/route\.ts$''',  # Public Stripe payment links
+  '''app/api/donations/payment-links/route\.ts''',  # Public Stripe payment links
+  '''.*payment-links.*''',  # Any file with payment-links in name
 ]
 
 commits = [
@@ -32,7 +33,8 @@ regexes = [
   '''sk_test_\.\.\.''',
   '''pk_live_\.\.\.''',
   '''pk_test_\.\.\.''',
-  # Allow public Stripe payment link URLs
+  # Allow public Stripe payment link URLs (full URLs with https)
+  '''https://buy\.stripe\.com/[a-zA-Z0-9]+''',
   '''buy\.stripe\.com/[a-zA-Z0-9]+''',
 ]
 
@@ -43,5 +45,7 @@ stops = [
   '''your_mapbox_token_here''',
   '''example''',
   '''placeholder''',
+  '''buy\.stripe\.com''',
+  '''stripe\.com''',
 ]
 
