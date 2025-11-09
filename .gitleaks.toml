@@ -21,9 +21,10 @@ paths = [
 ]
 
 # Precise regex for public Stripe payment links only
-# Format: https://buy.stripe.com/{23-char alphanumeric ID}
+# Format: https://buy.stripe.com/{variable-length alphanumeric ID}
+# Stripe payment link IDs are typically 20-30 characters
 regexes = [
-  '''^https://buy\.stripe\.com/[A-Za-z0-9]{23}$''',
+  '''^https://buy\.stripe\.com/[A-Za-z0-9]{20,30}$''',
 ]
 
 # Stopwords for known false positives in file content
