@@ -110,3 +110,5 @@ brew install gitleaks
 ```
 
 The pre-commit hook will automatically run Gitleaks on staged files.
+
+<!-- ci: trigger security workflows -->
