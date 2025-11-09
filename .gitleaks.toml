@@ -16,8 +16,11 @@ paths = [
   '''node_modules/.*''',
   '''\.next/.*''',
   '''coffee\.png$''',
-  '''app/api/donations/payment-links/route\.ts''',  # Public Stripe payment links file (removed $ anchor)
-  '''.*payment-links.*''',  # More permissive pattern for payment links files
+  # Allow payment links file - multiple patterns to ensure match
+  '''^app/api/donations/payment-links/route\.ts$''',
+  '''app/api/donations/payment-links/route\.ts''',
+  '''.*payment-links.*''',
+  '''.*/payment-links/.*''',
 ]
 
 commits = [
@@ -32,6 +35,7 @@ regexes = [
   # Only allow buy.stripe.com payment links (public URLs, not secrets)
   # Match exact payment link format (20+ alphanumeric chars after /)
   '''https://buy\.stripe\.com/[A-Za-z0-9]{20,}''',
+  '''https://buy\.stripe\.com/[A-Za-z0-9]+''',
   '''https?://buy\.stripe\.com/[A-Za-z0-9_\-/?=&#%]+''',
   # Allow example patterns in docs
   '''sk_live_\.\.\.''',
@@ -41,3 +45,13 @@ regexes = [
 ]
 
 # Do NOT add stripe.com to stops - we want to catch real secrets like sk_live_...
+
+# Additional allowlist for specific payment link IDs (as fallback)
+[allowlist.stops]
+stops = [
+  '''6oUfZhbYA0ofaz9f9h6c000''',  # $3 payment link
+  '''cNifZh3s46MD8r10en6c001''',  # $5 payment link
+  '''6oUdR92o0db1cHh3qz6c002''',  # $10 payment link
+  '''cNi6oH2o02wn8r1bX56c003''',  # $25 payment link
+  '''7sY6oH0fS4Ev5eP1ir6c004''',  # $50 payment link
+]
