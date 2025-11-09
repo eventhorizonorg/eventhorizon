@@ -16,11 +16,8 @@ paths = [
   '''node_modules/.*''',
   '''\.next/.*''',
   '''coffee\.png$''',
-  # Allow payment links file - multiple patterns to ensure match
-  '''^app/api/donations/payment-links/route\.ts$''',
-  '''app/api/donations/payment-links/route\.ts''',
-  '''.*payment-links.*''',
-  '''.*/payment-links/.*''',
+  # Allow payment links file - use simple pattern that matches file path
+  '''payment-links''',
 ]
 
 commits = [
@@ -46,12 +43,11 @@ regexes = [
 
 # Do NOT add stripe.com to stops - we want to catch real secrets like sk_live_...
 
-# Additional allowlist for specific payment link IDs (as fallback)
+# Stops list for commit messages (not file content)
 [allowlist.stops]
 stops = [
-  '''6oUfZhbYA0ofaz9f9h6c000''',  # $3 payment link
-  '''cNifZh3s46MD8r10en6c001''',  # $5 payment link
-  '''6oUdR92o0db1cHh3qz6c002''',  # $10 payment link
-  '''cNi6oH2o02wn8r1bX56c003''',  # $25 payment link
-  '''7sY6oH0fS4Ev5eP1ir6c004''',  # $50 payment link
+  '''your_stripe_secret_key_here''',
+  '''your_mapbox_token_here''',
+  '''example''',
+  '''placeholder''',
 ]
