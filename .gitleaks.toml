@@ -35,7 +35,7 @@ regexes = [
   '''https://buy\.stripe\.com/[A-Za-z0-9]{20,30}''',
 ]
 
-# Stopwords for known false positives in file content
+# Stopwords for known false positives in file content (must be within allowlist in v8)
 stopwords = [
   '''your_stripe_secret_key_here''',
   '''your_mapbox_token_here''',
@@ -44,5 +44,7 @@ stopwords = [
   '''placeholder''',
   '''sk_test_''',  # Allow test mode references in docs
   '''pk_test_''',
+  '''sk_live_''',  # Mentioned in docs
+  '''pk_live_''',
   '''mpk.eyJ1IjoiZGFuaWVsc3VueXVhbiIsImEiOiJjbHBiM3FhOXUwYmxnMmtubzljcGRwcHBjIn0.MO5mlsRbbl-O6labngyIaA''',  # Mapbox public token in git history
 ]
