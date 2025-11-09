@@ -32,12 +32,11 @@ commits = [
 # Format: https://buy.stripe.com/{variable-length alphanumeric ID}
 # Stripe payment link IDs are typically 20-30 characters
 regexes = [
-  '''^https://buy\.stripe\.com/[A-Za-z0-9]{20,30}$''',
+  '''https://buy\.stripe\.com/[A-Za-z0-9]{20,30}''',
 ]
 
 # Stopwords for known false positives in file content
-[allowlist.stops]
-stops = [
+stopwords = [
   '''your_stripe_secret_key_here''',
   '''your_mapbox_token_here''',
   '''your_supabase_url_here''',
