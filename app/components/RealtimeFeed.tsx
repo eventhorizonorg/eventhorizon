@@ -93,6 +93,8 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null)
   const [isExpanding, setIsExpanding] = useState(false)
   const [selectedWikipediaTitle, setSelectedWikipediaTitle] = useState<string | null>(null)
+  const [selectedEntityName, setSelectedEntityName] = useState<string | null>(null)
+  const [selectedEntityType, setSelectedEntityType] = useState<'location' | 'person' | null>(null)
   const postsRef = useRef<FeedPost[]>([])
 
 
@@ -212,6 +214,8 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
       setExpandedPostId(post.id)
       // Close Wikipedia panel when clicking a new post
       setSelectedWikipediaTitle(null)
+      setSelectedEntityName(null)
+      setSelectedEntityType(null)
       // Smoothly scroll the clicked post into view within the feed
       requestAnimationFrame(() => {
         const container = scrollContainerRef.current
@@ -414,6 +418,8 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
 
       await ensurePostPresent()
       setSelectedWikipediaTitle(null)
+      setSelectedEntityName(null)
+      setSelectedEntityType(null)
       setExpandedPostId(targetId)
 
       requestAnimationFrame(() => {
@@ -435,7 +441,8 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
     if (!entities) return text
 
     type EntityMeta = {
-      label: string
+      label: string  // Used for matching (canonical name or name)
+      displayLabel?: string  // Full name for display in tooltips
       wikipedia_title?: string
       wikipedia_url?: string
       type: 'person' | 'location' | 'policy' | 'group'
@@ -447,8 +454,12 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
     const addEntities = (items: WikipediaEntity[] = [], type: EntityMeta['type']) => {
       for (const item of items) {
         if (!item.name) continue
+        // Use canonical_name for matching if available, otherwise use name
+        // This helps match "Netanyahu" in text to "Benjamin Netanyahu" entity
+        const matchLabel = item.canonical_name || item.name
         taggedEntities.push({
-          label: item.name,
+          label: matchLabel,
+          displayLabel: item.name, // Keep original name for display
           wikipedia_title: item.wikipedia_title,
           wikipedia_url: item.wikipedia_url,
           role: item.role || item.title,
@@ -499,7 +510,7 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
 
           const entity = segment.entity
           const hasWikipedia = Boolean(entity.wikipedia_title || entity.wikipedia_url)
-          const tooltipParts = [entity.label]
+          const tooltipParts = [entity.displayLabel || entity.label]
           if (entity.role) {
             tooltipParts.push(entity.role)
           }
@@ -508,6 +519,8 @@ export default function RealtimeFeed({ onZoomToLocation, externalSelection }: Re
             event.stopPropagation()
             if (hasWikipedia) {
               setSelectedWikipediaTitle(entity.wikipedia_title || null)
+              setSelectedEntityName(entity.label)
+              setSelectedEntityType(entity.type === 'person' ? 'person' : entity.type === 'location' ? 'location' : null)
             }
           }
 
@@ -877,7 +890,13 @@ const renderLocationChips = (post: FeedPost) => {
       {/* Wikipedia Panel */}
       <WikipediaPanel 
         wikipediaTitle={selectedWikipediaTitle}
-        onClose={() => setSelectedWikipediaTitle(null)}
+        locationName={selectedEntityType === 'location' ? selectedEntityName || undefined : undefined}
+        personName={selectedEntityType === 'person' ? selectedEntityName || undefined : undefined}
+        onClose={() => {
+          setSelectedWikipediaTitle(null)
+          setSelectedEntityName(null)
+          setSelectedEntityType(null)
+        }}
       />
     </div>
   )

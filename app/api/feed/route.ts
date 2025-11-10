@@ -90,6 +90,7 @@ export async function GET(request: Request) {
       }
 
       // Get people data with Wikipedia links
+      console.log('Feed API - Querying people for post IDs:', postIds)
       const { data: peopleDataResult, error: peopleError } = await supabase
         .from('post_people')
         .select(`
@@ -99,9 +100,18 @@ export async function GET(request: Request) {
         `)
         .in('post_id', postIds)
 
+      console.log('Feed API - People query result:', { 
+        error: peopleError, 
+        dataLength: peopleDataResult?.length,
+        sampleData: peopleDataResult?.slice(0, 2)
+      })
+
       if (!peopleError) {
         peopleData = peopleDataResult || []
         console.log('Feed API - People data:', peopleData.length, 'relationships found')
+        console.log('Feed API - Sample people data:', JSON.stringify(peopleData.slice(0, 3), null, 2))
+      } else {
+        console.error('Feed API - People query error:', peopleError)
       }
 
       // Get policies data with Wikipedia links

@@ -30,6 +30,7 @@ interface WikipediaPanelProps {
   wikipediaTitle: string | null
   locationName?: string
   personName?: string
+  groupName?: string
   onClose: () => void
 }
 
@@ -37,6 +38,7 @@ export default function WikipediaPanel({
   wikipediaTitle, 
   locationName,
   personName,
+  groupName,
   onClose 
 }: WikipediaPanelProps) {
   const [data, setData] = useState<WikipediaData | null>(null)
@@ -204,12 +206,19 @@ export default function WikipediaPanel({
 
           {/* Timeline Section - Bottom 75% */}
           <div className="flex-1 overflow-hidden" style={{ height: '75%' }}>
-            {(locationName || personName) && (
-              <Timeline 
-                locationName={locationName}
-                personName={personName}
-              />
-            )}
+            {(() => {
+              console.log('WikipediaPanel Timeline render check:', { locationName, personName, groupName });
+              if (locationName || personName || groupName) {
+                return (
+                  <Timeline 
+                    locationName={locationName}
+                    personName={personName}
+                    groupName={groupName}
+                  />
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
       </div>
