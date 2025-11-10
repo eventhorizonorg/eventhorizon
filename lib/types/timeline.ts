@@ -21,6 +21,7 @@ export interface TimelineFilters {
   personName?: string // Filter by person name (searches people_master)
   policyId?: number
   groupId?: number
+  groupName?: string // Filter by group name (searches groups_master)
   channel?: string // Channel username or name
 }
 

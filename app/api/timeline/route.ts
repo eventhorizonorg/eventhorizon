@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       personName: searchParams.get('personName') || undefined,
       policyId: searchParams.get('policyId') || undefined,
       groupId: searchParams.get('groupId') || undefined,
+      groupName: searchParams.get('groupName') || undefined,
       channel: searchParams.get('channel') || undefined,
       page: searchParams.get('page') || undefined,
       limit: searchParams.get('limit') || undefined

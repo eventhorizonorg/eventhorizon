@@ -250,6 +250,61 @@ export async function findPersonIdByName(
 }
 
 /**
+ * Find group ID by name (searches groups_master table)
+ * Tries exact match first, then case-insensitive match, then aliases
+ */
+export async function findGroupIdByName(
+  supabase: SupabaseClient,
+  groupName: string
+): Promise<number | null> {
+  // Try exact match first (case-insensitive)
+  const { data: exactData, error: exactError } = await supabase
+    .from('groups_master')
+    .select('id')
+    .ilike('group_name', groupName)
+    .limit(1)
+    .maybeSingle()
+
+  if (!exactError && exactData) {
+    return exactData.id
+  }
+
+  // Try partial match (case-insensitive)
+  const { data: partialData, error: partialError } = await supabase
+    .from('groups_master')
+    .select('id')
+    .ilike('group_name', `%${groupName}%`)
+    .limit(1)
+    .maybeSingle()
+
+  if (!partialError && partialData) {
+    return partialData.id
+  }
+
+  // Try searching in aliases (Supabase array contains)
+  const { data: allGroups, error: aliasError } = await supabase
+    .from('groups_master')
+    .select('id, aliases')
+
+  if (!aliasError && allGroups) {
+    for (const group of allGroups) {
+      if (group.aliases && Array.isArray(group.aliases)) {
+        const normalizedGroupName = groupName.toLowerCase()
+        const match = group.aliases.some(
+          (alias: string) => alias.toLowerCase() === normalizedGroupName ||
+            alias.toLowerCase().includes(normalizedGroupName)
+        )
+        if (match) {
+          return group.id
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+/**
  * Get post IDs filtered by multiple entities (AND condition)
  * Supports both ID-based and name-based filtering
  */
@@ -285,11 +340,22 @@ export async function getPostIdsByMultipleEntities(
     }
   }
 
+  // Handle policy filtering (ID only for now)
   if (filters.policyId) {
     entityFilters.push({ type: 'policy', id: filters.policyId })
   }
+
+  // Handle group filtering (ID or name)
   if (filters.groupId) {
     entityFilters.push({ type: 'group', id: filters.groupId })
+  } else if (filters.groupName) {
+    const groupId = await findGroupIdByName(supabase, filters.groupName)
+    if (groupId) {
+      entityFilters.push({ type: 'group', id: groupId })
+    } else {
+      // Group name not found, return empty results
+      return []
+    }
   }
 
   if (entityFilters.length === 0) {
